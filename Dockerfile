@@ -75,6 +75,8 @@ RUN mv ./build_files/start.sh . && \
 RUN dos2unix ./start.sh && \
     chmod +x ./start.sh
 
+WORKDIR /comfy-ts
+RUN  python main.py --quick-test-for-ci --cpu
 # Set default values for environment variables
 # ENV APP_HOST=0.0.0.0
 # ENV APP_PORT=8080

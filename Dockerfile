@@ -1,4 +1,4 @@
-FROM nvidia/cuda:12.1.0-runtime-ubuntu22.04 as runtime
+FROM nvidia/cuda:12.1.1-runtime-ubuntu22.04 as runtime
 
 # Configure shell
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
@@ -14,7 +14,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 # Install system libraries
 RUN apt-get update --yes && \
     apt-get upgrade --yes && \
-    apt-get install --yes --no-install-recommends git wget curl bash libgl1 fuse software-properties-common openssh-server nginx rsync dos2unix ffmpeg libmagic1 && \
+    apt-get install --yes --no-install-recommends git wget curl bash libgl1 fuse software-properties-common openssh-server rsync dos2unix ffmpeg libmagic1 && \
     add-apt-repository ppa:deadsnakes/ppa && \
     apt-get --yes --no-install-recommends install python3.11-dev python3.11-venv && \
     echo "en_US.UTF-8 UTF-8" > /etc/locale.gen
@@ -55,24 +55,10 @@ RUN jupyter contrib nbextension install --user && \
 # Copy entire ComfyTS repo. Folders / files in .dockerignore will not be included
 COPY . .
 
-# Setup NGINX Proxy
-RUN mv ./build_files/nginx.conf /etc/nginx/nginx.conf
-RUN mv ./build_files/readme.html /usr/share/nginx/html/readme.html
-
 # Use dos2unix to ensure line-endings are unix-style
 # TO DO: if we build these directories into ComfyTS, we can remove this step
 RUN mv ./build_files/model_paths/symlinks.txt .
 RUN dos2unix ./symlinks.txt
-
-# Copying the catfs precompiled binary to container
-COPY catfs /usr/local/bin
-
-# Installing rsfw-cache
-WORKDIR /opt
-#RUN git clone https://github.com/m-arbaro/rsfw-cache
-WORKDIR /comfy-ts
-# Creating mountpoint for tmpfs:
-# RUN mkdir /usr/share/memory
 
 # Clone Custom-Nodes into container and install their dependencies
 RUN mkdir -p /usr/share/custom_nodes && \

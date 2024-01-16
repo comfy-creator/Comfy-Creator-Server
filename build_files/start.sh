@@ -6,12 +6,6 @@ set -e  # Exit the script if any statement returns a non-true return value
 #                          Function Definitions                                #
 # ---------------------------------------------------------------------------- #
 
-# Start nginx service
-start_nginx() {
-    echo "Starting Nginx service..."
-    service nginx start
-}
-
 # Setup ssh
 setup_ssh() {
     if [[ $PUBLIC_KEY ]]; then
@@ -125,21 +119,11 @@ else
 fi
 }
 
-#Setting up catfs cache
-catfs_mount_cache(){
-    mkdir /var/cache/models
-    /usr/local/bin/catfs /runpod-volume/models /var/cache/models /usr/share/memory &
-}
 
 # ---------------------------------------------------------------------------- #
 #                               Main Program                                   #
 # ---------------------------------------------------------------------------- #
-
-start_nginx
-#Commented out in favor of catfs
-#Uncomented back as catfs doesn't worked on runpod.
 cache_models
-#catfs_mount_cache
 create_sym_links
 run_comfy
 

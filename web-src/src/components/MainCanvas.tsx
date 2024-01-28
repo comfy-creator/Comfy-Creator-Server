@@ -1,11 +1,12 @@
 import {useEffect, useRef} from "react";
-import {ComfyApp} from "../scripts/app.ts";
+import {useComfyApp} from "../providers/ComfyApp";
 
-export function MainCanvas({app}: { app: ComfyApp }) {
+export function MainCanvas() {
+    const {app} = useComfyApp();
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
     useEffect(() => {
-        if (canvasRef.current) {
+        if (canvasRef.current && app) {
             canvasRef.current = app.canvasEl;
         }
     }, []);

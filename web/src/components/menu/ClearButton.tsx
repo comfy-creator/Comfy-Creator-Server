@@ -18,8 +18,6 @@ export function ClearButton({ confirmClear }: ClearButtonProps) {
             onClick={() => {
                 if (!confirmClear.value || confirm('Clear workflow?')) {
                     cleanApp();
-
-                    // @ts-expect-error
                     graph.clear();
                 }
             }}

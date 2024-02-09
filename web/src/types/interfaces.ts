@@ -92,7 +92,7 @@ export interface SerializedNodeObject {
 //     serializeGraph(graph: IComfyGraph): { serializedGraph: SerializedGraph; apiWorkflow: Record<string, WorkflowStep> };
 // }
 
-export interface IComfyGraph extends LGraph {
+export interface IComfyGraph extends LGraph<IComfyNode> {
     configure(data: object, keep_old?: boolean): boolean | undefined;
     onConfigure(data: object): void;
 
@@ -120,7 +120,7 @@ export interface IComfyGraph extends LGraph {
     // getNodeOnPos<T extends IComfyNode = IComfyNode>(x: number, y: number, node_list?: IComfyNode[], margin?: number): T | null;
 }
 
-export interface IComfyCanvas extends LGraphCanvas {
+export interface IComfyCanvas extends LGraphCanvas<IComfyNode, IComfyGraph> {
     selected_group_moving: boolean;
     abortController: AbortController;
 

@@ -161,7 +161,6 @@ export function ClipspaceProvider({ children }: { children: ReactNode }) {
                 }
             }
 
-            // @ts-expect-error
             graph?.setDirtyCanvas(true, true);
         }
     };

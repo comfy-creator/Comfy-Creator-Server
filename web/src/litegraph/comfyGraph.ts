@@ -144,7 +144,7 @@ export const defaultSerializeGraph = (graph: IComfyGraph): ReturnType<IComfyGrap
 //     }
 // }
 
-export class ComfyGraph extends LGraph implements IComfyGraph {
+export class ComfyGraph extends LGraph<IComfyNode> implements IComfyGraph {
     // Flag that the graph is configuring to prevent nodes from running checks while its still loading
     configuringGraph = false;
 
@@ -170,8 +170,7 @@ export class ComfyGraph extends LGraph implements IComfyGraph {
     onConfigure(data: object): void {
         // Fire callbacks before the onConfigure, this is used by widget inputs to setup the config
 
-        // @ts-expect-error
-        const nodes = this._nodes;
+        const nodes = this.nodes;
 
         for (const node of nodes) {
             node.onGraphConfigured?.();

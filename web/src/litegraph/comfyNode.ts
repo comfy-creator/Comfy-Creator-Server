@@ -8,7 +8,6 @@ import { ComfyWidget, comfyWidgetTypes } from '../types/comfyWidget.ts';
 import { AddDOMWidgetOptions, IComfyApp, IComfyNode } from '../types/interfaces.ts';
 import { clipspace } from '../scripts/clipspace.ts';
 
-
 interface Point {
     x: number;
     y: number;
@@ -374,9 +373,9 @@ export class ComfyNode extends LGraphNode implements IComfyNode {
                 }
 
                 const top = getImageTop(this);
-                var shiftY = top;
+                let shiftY = top;
 
-                let dw = this.size[0];
+                const dw = this.size[0];
                 let dh = this.size[1];
                 dh -= shiftY;
 
@@ -438,14 +437,14 @@ export class ComfyNode extends LGraphNode implements IComfyNode {
                         }
                         this.imageRects.push([x, y, cellWidth, cellHeight]);
 
-                        let wratio = cellWidth / img.width;
-                        let hratio = cellHeight / img.height;
-                        var ratio = Math.min(wratio, hratio);
+                        const wratio = cellWidth / img.width;
+                        const hratio = cellHeight / img.height;
+                        const ratio = Math.min(wratio, hratio);
 
-                        let imgHeight = ratio * img.height;
-                        let imgY = row * cellHeight + shiftY + (cellHeight - imgHeight) / 2;
-                        let imgWidth = ratio * img.width;
-                        let imgX = col * cellWidth + shiftX + (cellWidth - imgWidth) / 2;
+                        const imgHeight = ratio * img.height;
+                        const imgY = row * cellHeight + shiftY + (cellHeight - imgHeight) / 2;
+                        const imgWidth = ratio * img.width;
+                        const imgX = col * cellWidth + shiftX + (cellWidth - imgWidth) / 2;
 
                         ctx.drawImage(
                             img,
@@ -532,7 +531,7 @@ export class ComfyNode extends LGraphNode implements IComfyNode {
                     if (numImages > 1) {
                         if (this.imageIndex && this.pointerDown) {
                             if (drawButton(dw - 40, dh + top - 40, 30, `${this.imageIndex + 1}/${numImages}`)) {
-                                let i = this.imageIndex + 1 >= numImages ? 0 : this.imageIndex + 1;
+                                const i = this.imageIndex + 1 >= numImages ? 0 : this.imageIndex + 1;
                                 // if (!this.pointerDown || !this.pointerDown.index === i) {
                                 if (!this.pointerDown || !(this.pointerDown.index === i)) {
                                     if (mouse) {

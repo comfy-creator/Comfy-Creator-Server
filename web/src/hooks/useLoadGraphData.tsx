@@ -71,6 +71,7 @@ export function useLoadGraphData() {
             return;
         }
 
+        // @ts-expect-error
         for (const node of graph?.nodes || []) {
             const size = node.computeSize();
             size[0] = Math.max(node.size[0], size[0]);

@@ -59,6 +59,7 @@ export const JobQueueContextProvider: React.FC<{ children: ReactNode }> = ({ chi
     function runNodeCallbacks(workflow: Record<string, WorkflowStep>) {
         for (const nodeId of Object.keys(workflow)) {
             // TO DO: this assumes that nodeIds are always stringified numbers, which is the default for LiteGraph.js
+            // @ts-expect-error
             const node = graph.getNodeById(Number(nodeId));
             if (node?.widgets) {
                 for (const widget of node.widgets) {
@@ -69,6 +70,7 @@ export const JobQueueContextProvider: React.FC<{ children: ReactNode }> = ({ chi
             }
         }
 
+        // @ts-expect-error
         canvas.draw(true, true);
     }
 

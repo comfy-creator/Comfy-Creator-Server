@@ -10,7 +10,7 @@ import { IComfyCanvas, IComfyGraph, IComfyNode } from '../types/interfaces';
 
 // TO DO: list all hot keys this class has and what they do
 
-export class ComfyCanvas extends LGraphCanvas<IComfyNode, IComfyGraph> implements IComfyCanvas {
+export class ComfyCanvas extends LGraphCanvas implements IComfyCanvas {
     static instance: ComfyCanvas | null = null;
 
     lastNodeErrors: Record<string, ComfyError> | null = null;
@@ -22,6 +22,7 @@ export class ComfyCanvas extends LGraphCanvas<IComfyNode, IComfyGraph> implement
         graph?: ComfyGraph,
         options?: { skip_render?: boolean; autoresize?: boolean }
     ) {
+        // @ts-expect-error
         super(canvas, graph, options);
 
         // Add canvas-event listeners

@@ -13,9 +13,9 @@ export function LoadDefaultButton({ confirmClear }: LoadDefaultButtonProps) {
     return (
         <button
             id="comfy-load-default-button"
-            onClick={async () => {
+            onClick={() => {
                 if (!confirmClear.value || confirm('Load default workflow?')) {
-                    await loadGraphData();
+                    loadGraphData();
                 }
             }}
         >

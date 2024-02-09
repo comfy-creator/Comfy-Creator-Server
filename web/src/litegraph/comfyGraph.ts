@@ -3,6 +3,7 @@ import { ComfyNode } from './comfyNode';
 import { WorkflowStep } from '../../autogen_web_ts/comfy_request.v1';
 import type { SerializedGraph } from '../types/litegraph';
 import type { IComfyGraph, IComfyNode } from '../types/interfaces';
+import { inject, injectable } from 'inversify';
 
 /** Converts the current graph serializedGraph for sending to the API */
 export const defaultSerializeGraph = (graph: IComfyGraph): ReturnType<IComfyGraph['serializeGraph']> => {
@@ -143,14 +144,13 @@ export const defaultSerializeGraph = (graph: IComfyGraph): ReturnType<IComfyGrap
 //     }
 // }
 
-// @injectable()
-export class ComfyGraph extends LGraph<ComfyNode> implements IComfyGraph {
+export class ComfyGraph extends LGraph implements IComfyGraph {
     // Flag that the graph is configuring to prevent nodes from running checks while its still loading
     configuringGraph = false;
 
     /** Optionally pass in a former graph-state to have it restored */
     constructor(
-        // @inject('ISerializeGraph') private serializeStrategy: ISerializeGraph,
+        // @inject('ISerializeGraph') private serializeStrategy: ISerializeGraph
         serializedGraph?: SerializedGraph
     ) {
         super(serializedGraph);
@@ -169,14 +169,18 @@ export class ComfyGraph extends LGraph<ComfyNode> implements IComfyGraph {
 
     onConfigure(data: object): void {
         // Fire callbacks before the onConfigure, this is used by widget inputs to setup the config
-        for (const node of this.nodes) {
+
+        // @ts-expect-error
+        const nodes = this._nodes;
+
+        for (const node of nodes) {
             node.onGraphConfigured?.();
         }
 
         const r = super.onConfigure ? super.onConfigure(data) : undefined;
 
         // Fire after onConfigure, used by primitves to generate widget using input nodes config
-        for (const node of this.nodes) {
+        for (const node of nodes) {
             node.onAfterGraphConfigured?.();
         }
 
@@ -192,7 +196,6 @@ export class ComfyGraph extends LGraph<ComfyNode> implements IComfyGraph {
     }
 
     attachCanvas(graphCanvas: LGraphCanvas) {
-        // TODO: is this okay...?
         graphCanvas.constructor = LGraphCanvas;
         super.attachCanvas(graphCanvas);
     }

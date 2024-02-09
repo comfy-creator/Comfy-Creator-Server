@@ -9,6 +9,7 @@ interface DevSaveButtonProps {
 
 export function DevSaveButton({ promptFilename }: DevSaveButtonProps) {
     const { graphToPrompt } = usePrompt();
+    const download = useRef<HTMLAnchorElement>(document.createElement('a'));
 
     return (
         <button
@@ -29,24 +30,16 @@ export function DevSaveButton({ promptFilename }: DevSaveButtonProps) {
                     const blob = new Blob([json], { type: 'application/json' });
                     const url = URL.createObjectURL(blob);
 
-                    function Link() {
-                        const ref = useRef<HTMLAnchorElement>(null);
+                    download.current.href = url;
+                    download.current.download = filename!;
+                    download.current.style.display = 'none';
 
-                        useEffect(() => {
-                            ref.current?.click();
+                    download.current.click();
 
-                            return () => {
-                                setTimeout(function () {
-                                    ref.current?.remove();
-                                    window.URL.revokeObjectURL(url);
-                                }, 0);
-                            };
-                        }, []);
-
-                        return <a ref={ref} href={url} download={filename} style={{ display: 'none' }} />;
-                    }
-
-                    return <Link />;
+                    setTimeout(function () {
+                        download.current.remove();
+                        window.URL.revokeObjectURL(url);
+                    }, 0);
                 });
             }}
         >

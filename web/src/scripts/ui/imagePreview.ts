@@ -1,8 +1,9 @@
+import { IComfyNode } from '../../types/interfaces';
 
-export function calculateImageGrid(imgs, dw, dh) {
+export function calculateImageGrid(imgs: HTMLImageElement[], dw: number, dh: number) {
     let best = 0;
-    let w = imgs[0].naturalWidth;
-    let h = imgs[0].naturalHeight;
+    const w = imgs[0].naturalWidth;
+    const h = imgs[0].naturalHeight;
     const numImages = imgs.length;
 
     let cellWidth, cellHeight, cols, rows, shiftX;
@@ -32,9 +33,9 @@ export function calculateImageGrid(imgs, dw, dh) {
     return { cellWidth, cellHeight, cols, rows, shiftX };
 }
 
-export function createImageHost(node) {
+export function createImageHost(node: IComfyNode) {
     const el = $el('div.comfy-img-preview');
-    let currentImgs;
+    let currentImgs: HTMLImageElement[];
     let first = true;
 
     function updateSize() {
@@ -56,16 +57,15 @@ export function createImageHost(node) {
 
             const nw = node.size[0];
             ({ cellWidth: w, cellHeight: h } = calculateImageGrid(currentImgs, nw - 20, elH));
-            w += 'px';
-            h += 'px';
 
-            el.style.setProperty('--comfy-img-preview-width', w);
-            el.style.setProperty('--comfy-img-preview-height', h);
+            el.style.setProperty('--comfy-img-preview-width', `${w}px`);
+            el.style.setProperty('--comfy-img-preview-height', `${h}px`);
         }
     }
+
     return {
         el,
-        updateImages(imgs) {
+        updateImages(imgs: HTMLImageElement[]) {
             if (imgs !== currentImgs) {
                 if (currentImgs == null) {
                     requestAnimationFrame(() => {

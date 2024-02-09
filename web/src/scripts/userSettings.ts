@@ -1,6 +1,7 @@
 import { $el } from './utils.ts';
 import { IComfyUserSettings } from '../types/interfaces.ts';
 import { api } from './api.tsx';
+import { v4 as uuidv4 } from 'uuid';
 
 export class ComfyUserSettings implements IComfyUserSettings {
     private static instance: ComfyUserSettings;
@@ -55,18 +56,13 @@ export class ComfyUserSettings implements IComfyUserSettings {
         let user = localStorage['Comfy.userId'];
         const users = userConfig.users ?? {};
         if (!user || !users[user]) {
-            // This will rarely be hit so move the loading to on demand
-            const { UserSelectionScreen } = await import('./ui/userSelection');
-            this.ui.menuContainer.style.display = 'none';
-            const { userId, username, created } = await new UserSelectionScreen().show(users, user);
-            this.ui.menuContainer.style.display = '';
-            user = userId;
-            localStorage['Comfy.userName'] = username;
+            user = uuidv4();
+
+            localStorage['Comfy.userName'] = user;
             localStorage['Comfy.userId'] = user;
-            if (created) {
-                api.user = user;
-                await this.#migrateSettings();
-            }
+
+            api.user = user;
+            await this.#migrateSettings();
         }
 
         api.user = user;

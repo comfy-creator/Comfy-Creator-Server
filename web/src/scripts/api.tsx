@@ -29,7 +29,6 @@ export class ComfyApi extends EventTarget implements IComfyApi {
         this.#registered = new Set();
         this.api_host = host ?? location.host;
         this.api_base = location.pathname.split('/').slice(0, -1).join('/');
-        this.clientId = sessionStorage.getItem('clientId')!;
     }
 
     /** Initialises sockets for realtime updates */
@@ -157,7 +156,8 @@ export class ComfyApi extends EventTarget implements IComfyApi {
                         case 'status':
                             if (msg.data.sid) {
                                 this.clientId = msg.data.sid;
-                                if (this.clientId) window.name = this.clientId;
+                                if (this.clientId) window.name = this.clientId; // use window name so it isnt reused when duplicating tabs
+                                sessionStorage.setItem('clientId', this.clientId ?? ''); // store in session storage so duplicate tab can load correct workflow
                             }
                             this.dispatchEvent(new CustomEvent('status', { detail: msg.data.status }));
                             break;

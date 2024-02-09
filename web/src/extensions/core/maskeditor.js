@@ -540,8 +540,8 @@ class MaskEditorDialog extends ComfyDialog {
     }
 
     brush_size = 10;
-    drawing_mode = false;
     brush_color_mode = 'black';
+    drawing_mode = false;
     lastx = -1;
     lasty = -1;
     lasttime = 0;

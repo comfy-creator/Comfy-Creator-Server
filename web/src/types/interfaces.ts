@@ -29,7 +29,10 @@ export interface AddDOMWidgetOptions {
     afterResize?: (node: IComfyNode) => void;
 }
 
+export const SIZE = Symbol();
+
 export interface IComfyNode extends LGraphNode {
+    [SIZE]: boolean | null;
     category: any; // Replace 'any' with the actual type if known
     imageIndex?: number | null;
     imageOffset?: number;
@@ -40,6 +43,7 @@ export interface IComfyNode extends LGraphNode {
     widgets: ComfyWidget[];
     resetExecution: boolean;
     pointerWasDown?: boolean | null;
+    isVirtualNode: boolean;
 
     // Event handlers
     onGraphConfigured?: () => void;

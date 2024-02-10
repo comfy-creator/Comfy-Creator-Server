@@ -13,6 +13,7 @@ interface ISettingsContext {
     load: () => Promise<void>;
     getId: (id: string) => string;
     addSetting: (setting: IAddSetting) => any;
+    removeSetting: (id: string) => void;
     setSettingValue: (id: string, value: any) => void;
     getSettingValue: (id: string, defaultValue?: any) => any;
 }
@@ -279,6 +280,10 @@ export const SettingsContextProvider: React.FC = ({ children }) => {
         };
     };
 
+    const removeSetting = (id: string) => {
+        // TO DO
+    };
+
     return (
         <SettingsContext.Provider
             value={{
@@ -286,6 +291,7 @@ export const SettingsContextProvider: React.FC = ({ children }) => {
                 getId,
                 show,
                 addSetting,
+                removeSetting,
                 setSettingValue,
                 getSettingValue,
             }}

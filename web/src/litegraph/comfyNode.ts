@@ -5,7 +5,7 @@ import { $el } from '../scripts/utils';
 import { calculateGrid, getImageTop, is_all_same_aspect_ratio } from '../scripts/helpers';
 import { calculateImageGrid, createImageHost } from '../scripts/ui/imagePreview';
 import { ComfyWidget, comfyWidgetTypes } from '../types/comfyWidget';
-import { AddDOMWidgetOptions, IComfyApp, IComfyNode } from '../types/interfaces';
+import { AddDOMWidgetOptions, IComfyApp, IComfyNode, SIZE } from '../types/interfaces';
 import { clipspace } from '../scripts/clipspace';
 
 interface Point {
@@ -24,7 +24,7 @@ function intersect(a: Point, b: Point) {
     else return null;
 }
 
-export function getClipPath(node: ComfyNode, element: Element, elRect: Point) {
+export function getClipPath(node: IComfyNode, element: Element, elRect: Point) {
     // if (app.canvas) {
     //     const selectedNode = Object.values(app.canvas.selected_nodes)[0];
     //     if (selectedNode && selectedNode !== node) {
@@ -63,19 +63,7 @@ export function getClipPath(node: ComfyNode, element: Element, elRect: Point) {
     return '';
 }
 
-export function addDomClippingSetting() {
-    ui.settings.addSetting({
-        id: 'Comfy.DOMClippingEnabled',
-        name: 'Enable DOM element clipping (enabling may reduce performance)',
-        type: 'boolean',
-        defaultValue: true,
-        onChange(value: boolean) {},
-    });
-}
-
 export const ANIM_PREVIEW_WIDGET = '$$comfy_animation_preview';
-
-const SIZE = Symbol();
 
 // TO DO: replace 'any' types with actually useful types
 export class ComfyNode extends LGraphNode implements IComfyNode {
@@ -713,13 +701,8 @@ export class ComfyNode extends LGraphNode implements IComfyNode {
                     width: `${widgetWidth - margin * 2}px`,
                     height: `${(widget.computedHeight ?? 50) - margin * 2}px`,
                     position: 'absolute',
-                    zIndex: app.graph?.nodes.indexOf(node as ComfyNode),
+                    zIndex: app.graph?.nodes.indexOf(node),
                 });
-
-                if (app.ui.settings.getSettingValue('Comfy.DOMClippingEnabled', true)) {
-                    element.style.clipPath = getClipPath(node as ComfyNode, element, elRect);
-                    element.style.willChange = 'clip-path';
-                }
 
                 this.options.onDraw?.(widget);
             },

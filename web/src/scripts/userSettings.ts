@@ -33,7 +33,9 @@ export class ComfyUserSettings implements IComfyUserSettings {
             if (v) {
                 try {
                     p[n] = JSON.parse(v);
-                } catch (error) {}
+                } catch (error) {
+                    console.error(error);
+                }
             }
             return p;
         }, {});

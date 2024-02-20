@@ -56,7 +56,7 @@ def find_package_manager():
     raise RuntimeError("No suitable JavaScript package manager found. Please install yarn, npm, or pnpm so we can build the client.")
 
 
-def install_dependencies():
+def install_js_dependencies():
     manager = find_package_manager()
     print(f"Installing dependencies with {manager}...")
     subprocess.run([manager, "install"], check=True, cwd='web', shell=True)
@@ -109,7 +109,7 @@ async def get_api_key() -> str:
 
 async def main():
     if not is_build_up_to_date():
-        install_dependencies()
+        install_js_dependencies()
         run_js_script('build')
 
     questions = [

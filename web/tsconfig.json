@@ -27,6 +27,6 @@
 
         "paths": { "react": ["./node_modules/@types/react"] },
     },
-    "include": ["src", "vite.config.ts"],
+    "include": ["src", "vite.config.ts", "../proto/autogen_web_ts/**/*"],
     "references": [{ "path": "./tsconfig.node.json" }],
 }

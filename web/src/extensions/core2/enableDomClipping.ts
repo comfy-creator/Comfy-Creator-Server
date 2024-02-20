@@ -23,6 +23,8 @@ export const DomClippingPlugin: IComfyPlugin<void> = {
             type: 'boolean',
             defaultValue: true,
         });
+
+        // app.comfyNode.
     },
     deactivate: async app => {
         app.ui.settings.removeSetting(id);

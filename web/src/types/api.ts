@@ -1,7 +1,7 @@
 import { ComfyError } from './many';
-import { JobCreated, WorkflowStep } from '../../autogen_web_ts/comfy_request.v1';
+import { JobCreated, WorkflowStep } from '../../../proto/autogen_web_ts/comfy_request.v1';
 import { ComfyObjectInfo } from './comfy';
-// import { SerializedGraph } from '../../autogen_web_ts/serialized_graph.v1';
+// import { SerializedGraph } from '../../../proto/autogen_web_ts/serialized_graph.v1';
 import { SerializedGraph } from './litegraph';
 
 export type EmbeddingsResponse = string[];

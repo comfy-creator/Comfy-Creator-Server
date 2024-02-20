@@ -10,7 +10,7 @@ import {
 } from '../types/api';
 import { WorkflowStep } from '../types/many';
 import { SerializedGraph } from '../types/litegraph';
-import { JobCreated } from '../../autogen_web_ts/comfy_request.v1';
+import { JobCreated } from '../../../proto/autogen_web_ts/comfy_request.v1';
 
 type storeUserDataOptions = RequestInit & { stringify?: boolean; throwOnError?: boolean };
 

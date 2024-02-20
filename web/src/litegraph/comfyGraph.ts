@@ -1,6 +1,6 @@
 import { LGraph, LGraphCanvas } from 'litegraph.js';
 import { ComfyNode } from './comfyNode';
-import { WorkflowStep } from '../../autogen_web_ts/comfy_request.v1';
+import { WorkflowStep } from '../../../proto/autogen_web_ts/comfy_request.v1';
 import type { SerializedGraph } from '../types/litegraph';
 import type { IComfyGraph, IComfyNode } from '../types/interfaces';
 import { inject, injectable } from 'inversify';

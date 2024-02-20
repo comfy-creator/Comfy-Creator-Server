@@ -4,7 +4,7 @@
 import { IWidget, LGraph, LGraphCanvas, LGraphNode, Vector2 } from 'litegraph.js';
 import { ComfyError, ComfyImages } from './many';
 import { ComfyWidget } from './comfyWidget';
-import { WorkflowStep } from '../../autogen_web_ts/comfy_request.v1';
+import { WorkflowStep } from '../../../proto/autogen_web_ts/comfy_request.v1';
 import { ComfyObjectInfo } from './comfy';
 import { IComfyApi } from './api';
 import { SerializedGraph } from './litegraph';

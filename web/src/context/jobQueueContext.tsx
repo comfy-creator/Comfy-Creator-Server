@@ -3,7 +3,7 @@ import { createContext, useState, useEffect, ReactNode } from 'react';
 import { createUseContextHook } from './hookCreator';
 import { LastNodeErrors, QueueItem } from '../types/many';
 import { ApiEventEmitter } from './apiContext';
-import { ComfyMessage, ComfyMessage_QueueStatus, WorkflowStep } from '../../autogen_web_ts/comfy_request.v1';
+import { ComfyMessage, ComfyMessage_QueueStatus, WorkflowStep } from '../../../proto/autogen_web_ts/comfy_request.v1';
 import { useApiContext } from './apiContext';
 import { useGraph } from './graphContext';
 

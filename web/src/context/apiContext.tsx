@@ -4,8 +4,13 @@ import ReconnectingWebSocket from 'reconnecting-websocket';
 import { api } from '../scripts/api';
 import { createUseContextHook } from './hookCreator';
 import { createChannel, createClient, Metadata } from 'nice-grpc-web';
-import { ComfyClient, ComfyDefinition, ComfyMessage, JobCreated } from '../../autogen_web_ts/comfy_request.v1.ts';
-import { WorkflowStep } from '../../autogen_web_ts/comfy_request.v1.ts';
+import {
+    ComfyClient,
+    ComfyDefinition,
+    ComfyMessage,
+    JobCreated,
+} from '../../../proto/autogen_web_ts/comfy_request.v1.ts';
+import { WorkflowStep } from '../../../proto/autogen_web_ts/comfy_request.v1.ts';
 import { SerializedGraph } from '../types/litegraph';
 import {
     IComfyApi,
@@ -135,7 +140,7 @@ export const ApiContextProvider: React.FC<{ children: ReactNode }> = ({ children
 
         const abortController = new AbortController();
 
-        const stream = comfyClient.streamRoom({ session_id: sessionId }, { signal: abortController.signal });
+        const stream = comfyClient.streamSession({ session_id: sessionId }, { signal: abortController.signal });
 
         setConnectionStatus(ApiStatus.CONNECTING);
 

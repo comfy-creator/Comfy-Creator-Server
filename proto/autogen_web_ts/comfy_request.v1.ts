@@ -81,19 +81,6 @@ export interface ComfyRequest_WorkflowEntry {
   value: WorkflowStep | undefined;
 }
 
-/**
- * ComfyUI has 'delete' (remove specific non-running items), and 'interrupt'
- * (stop currently running process) commands. We roll them all into a single endpoint here.
- */
-export interface CancelJob {
-  job_id: string;
-}
-
-/** ComfyUI calls this 'clear' (remove all queued items owned by the user) */
-export interface PurgeRoomQueue {
-  session_id: string;
-}
-
 export interface JobCreated {
   /** created by the server; id of the job in the queue */
   job_id: string;
@@ -103,11 +90,16 @@ export interface JobCreated {
   execution_seconds: number;
 }
 
-/** Temp-files and latent-previews are not included */
+/** Latent-previews are not included */
 export interface JobOutput {
   job_id: string;
   session_id: string;
   files: WorkflowFile[];
+}
+
+/** A list of job outputs from a session */
+export interface SessionHistory {
+  outputs: JobOutput[];
 }
 
 /** It's assumed that the consumer knows what session_id it's watching */
@@ -212,14 +204,80 @@ export interface MessageFilter {
 }
 
 /** By default, all message-types will be returned, unless a filter is applied */
-export interface RoomStreamRequest {
+export interface StreamSessionRequest {
   session_id: string;
   filter?: MessageFilter | undefined;
 }
 
-export interface JobStreamRequest {
+export interface StreamJobRequest {
   job_id: string;
   filter?: MessageFilter | undefined;
+}
+
+export interface SessionId {
+  session_id: string;
+}
+
+export interface JobId {
+  job_id: string;
+}
+
+export interface NodeDefinition {
+  display_name: string;
+  description: string;
+  category: string;
+  inputs: NodeDefinition_InputDef[];
+  outputs: NodeDefinition_OutputDef[];
+  output_node: boolean;
+}
+
+export interface NodeDefinition_InputDef {
+  label: string;
+  edge_type: string;
+  spec: { [key: string]: any } | undefined;
+}
+
+export interface NodeDefinition_OutputDef {
+  label: string;
+  edge_type: string;
+}
+
+export interface NodeDefs {
+  defs: { [key: string]: NodeDefinition };
+}
+
+export interface NodeDefs_DefsEntry {
+  key: string;
+  value: NodeDefinition | undefined;
+}
+
+/** Leave blank to retrieve all node definitions */
+export interface NodeDefRequest {
+  extension_ids: string[];
+}
+
+export interface Models {
+  info: Models_ModelInfo[];
+}
+
+export interface Models_ModelInfo {
+  blake3_hash: string;
+  display_name: string;
+}
+
+/** Maps architecture to model */
+export interface ModelCatalog {
+  models: { [key: string]: Models };
+}
+
+export interface ModelCatalog_ModelsEntry {
+  key: string;
+  value: Models | undefined;
+}
+
+/** Leave blank to retrieve all models */
+export interface ModelCatalogRequest {
+  architecture: string[];
 }
 
 function createBaseWorkflowStep(): WorkflowStep {
@@ -650,96 +708,6 @@ export const ComfyRequest_WorkflowEntry = {
   },
 };
 
-function createBaseCancelJob(): CancelJob {
-  return { job_id: "" };
-}
-
-export const CancelJob = {
-  encode(message: CancelJob, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
-    if (message.job_id !== "") {
-      writer.uint32(10).string(message.job_id);
-    }
-    return writer;
-  },
-
-  decode(input: _m0.Reader | Uint8Array, length?: number): CancelJob {
-    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
-    let end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseCancelJob();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1:
-          if (tag !== 10) {
-            break;
-          }
-
-          message.job_id = reader.string();
-          continue;
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skipType(tag & 7);
-    }
-    return message;
-  },
-
-  create(base?: DeepPartial<CancelJob>): CancelJob {
-    return CancelJob.fromPartial(base ?? {});
-  },
-  fromPartial(object: DeepPartial<CancelJob>): CancelJob {
-    const message = createBaseCancelJob();
-    message.job_id = object.job_id ?? "";
-    return message;
-  },
-};
-
-function createBasePurgeRoomQueue(): PurgeRoomQueue {
-  return { session_id: "" };
-}
-
-export const PurgeRoomQueue = {
-  encode(message: PurgeRoomQueue, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
-    if (message.session_id !== "") {
-      writer.uint32(10).string(message.session_id);
-    }
-    return writer;
-  },
-
-  decode(input: _m0.Reader | Uint8Array, length?: number): PurgeRoomQueue {
-    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
-    let end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBasePurgeRoomQueue();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1:
-          if (tag !== 10) {
-            break;
-          }
-
-          message.session_id = reader.string();
-          continue;
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skipType(tag & 7);
-    }
-    return message;
-  },
-
-  create(base?: DeepPartial<PurgeRoomQueue>): PurgeRoomQueue {
-    return PurgeRoomQueue.fromPartial(base ?? {});
-  },
-  fromPartial(object: DeepPartial<PurgeRoomQueue>): PurgeRoomQueue {
-    const message = createBasePurgeRoomQueue();
-    message.session_id = object.session_id ?? "";
-    return message;
-  },
-};
-
 function createBaseJobCreated(): JobCreated {
   return { job_id: "", session_id: "", queue_seconds: 0, execution_seconds: 0 };
 }
@@ -881,6 +849,51 @@ export const JobOutput = {
     message.job_id = object.job_id ?? "";
     message.session_id = object.session_id ?? "";
     message.files = object.files?.map((e) => WorkflowFile.fromPartial(e)) || [];
+    return message;
+  },
+};
+
+function createBaseSessionHistory(): SessionHistory {
+  return { outputs: [] };
+}
+
+export const SessionHistory = {
+  encode(message: SessionHistory, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    for (const v of message.outputs) {
+      JobOutput.encode(v!, writer.uint32(10).fork()).ldelim();
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): SessionHistory {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseSessionHistory();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.outputs.push(JobOutput.decode(reader, reader.uint32()));
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  create(base?: DeepPartial<SessionHistory>): SessionHistory {
+    return SessionHistory.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<SessionHistory>): SessionHistory {
+    const message = createBaseSessionHistory();
+    message.outputs = object.outputs?.map((e) => JobOutput.fromPartial(e)) || [];
     return message;
   },
 };
@@ -1684,12 +1697,12 @@ export const MessageFilter = {
   },
 };
 
-function createBaseRoomStreamRequest(): RoomStreamRequest {
+function createBaseStreamSessionRequest(): StreamSessionRequest {
   return { session_id: "", filter: undefined };
 }
 
-export const RoomStreamRequest = {
-  encode(message: RoomStreamRequest, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+export const StreamSessionRequest = {
+  encode(message: StreamSessionRequest, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
     if (message.session_id !== "") {
       writer.uint32(10).string(message.session_id);
     }
@@ -1699,10 +1712,10 @@ export const RoomStreamRequest = {
     return writer;
   },
 
-  decode(input: _m0.Reader | Uint8Array, length?: number): RoomStreamRequest {
+  decode(input: _m0.Reader | Uint8Array, length?: number): StreamSessionRequest {
     const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
     let end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseRoomStreamRequest();
+    const message = createBaseStreamSessionRequest();
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
@@ -1729,11 +1742,11 @@ export const RoomStreamRequest = {
     return message;
   },
 
-  create(base?: DeepPartial<RoomStreamRequest>): RoomStreamRequest {
-    return RoomStreamRequest.fromPartial(base ?? {});
+  create(base?: DeepPartial<StreamSessionRequest>): StreamSessionRequest {
+    return StreamSessionRequest.fromPartial(base ?? {});
   },
-  fromPartial(object: DeepPartial<RoomStreamRequest>): RoomStreamRequest {
-    const message = createBaseRoomStreamRequest();
+  fromPartial(object: DeepPartial<StreamSessionRequest>): StreamSessionRequest {
+    const message = createBaseStreamSessionRequest();
     message.session_id = object.session_id ?? "";
     message.filter = (object.filter !== undefined && object.filter !== null)
       ? MessageFilter.fromPartial(object.filter)
@@ -1742,12 +1755,12 @@ export const RoomStreamRequest = {
   },
 };
 
-function createBaseJobStreamRequest(): JobStreamRequest {
+function createBaseStreamJobRequest(): StreamJobRequest {
   return { job_id: "", filter: undefined };
 }
 
-export const JobStreamRequest = {
-  encode(message: JobStreamRequest, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+export const StreamJobRequest = {
+  encode(message: StreamJobRequest, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
     if (message.job_id !== "") {
       writer.uint32(10).string(message.job_id);
     }
@@ -1757,10 +1770,10 @@ export const JobStreamRequest = {
     return writer;
   },
 
-  decode(input: _m0.Reader | Uint8Array, length?: number): JobStreamRequest {
+  decode(input: _m0.Reader | Uint8Array, length?: number): StreamJobRequest {
     const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
     let end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseJobStreamRequest();
+    const message = createBaseStreamJobRequest();
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
@@ -1787,15 +1800,741 @@ export const JobStreamRequest = {
     return message;
   },
 
-  create(base?: DeepPartial<JobStreamRequest>): JobStreamRequest {
-    return JobStreamRequest.fromPartial(base ?? {});
+  create(base?: DeepPartial<StreamJobRequest>): StreamJobRequest {
+    return StreamJobRequest.fromPartial(base ?? {});
   },
-  fromPartial(object: DeepPartial<JobStreamRequest>): JobStreamRequest {
-    const message = createBaseJobStreamRequest();
+  fromPartial(object: DeepPartial<StreamJobRequest>): StreamJobRequest {
+    const message = createBaseStreamJobRequest();
     message.job_id = object.job_id ?? "";
     message.filter = (object.filter !== undefined && object.filter !== null)
       ? MessageFilter.fromPartial(object.filter)
       : undefined;
+    return message;
+  },
+};
+
+function createBaseSessionId(): SessionId {
+  return { session_id: "" };
+}
+
+export const SessionId = {
+  encode(message: SessionId, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.session_id !== "") {
+      writer.uint32(10).string(message.session_id);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): SessionId {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseSessionId();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.session_id = reader.string();
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  create(base?: DeepPartial<SessionId>): SessionId {
+    return SessionId.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<SessionId>): SessionId {
+    const message = createBaseSessionId();
+    message.session_id = object.session_id ?? "";
+    return message;
+  },
+};
+
+function createBaseJobId(): JobId {
+  return { job_id: "" };
+}
+
+export const JobId = {
+  encode(message: JobId, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.job_id !== "") {
+      writer.uint32(10).string(message.job_id);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): JobId {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseJobId();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.job_id = reader.string();
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  create(base?: DeepPartial<JobId>): JobId {
+    return JobId.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<JobId>): JobId {
+    const message = createBaseJobId();
+    message.job_id = object.job_id ?? "";
+    return message;
+  },
+};
+
+function createBaseNodeDefinition(): NodeDefinition {
+  return { display_name: "", description: "", category: "", inputs: [], outputs: [], output_node: false };
+}
+
+export const NodeDefinition = {
+  encode(message: NodeDefinition, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.display_name !== "") {
+      writer.uint32(10).string(message.display_name);
+    }
+    if (message.description !== "") {
+      writer.uint32(18).string(message.description);
+    }
+    if (message.category !== "") {
+      writer.uint32(26).string(message.category);
+    }
+    for (const v of message.inputs) {
+      NodeDefinition_InputDef.encode(v!, writer.uint32(34).fork()).ldelim();
+    }
+    for (const v of message.outputs) {
+      NodeDefinition_OutputDef.encode(v!, writer.uint32(42).fork()).ldelim();
+    }
+    if (message.output_node === true) {
+      writer.uint32(48).bool(message.output_node);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): NodeDefinition {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseNodeDefinition();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.display_name = reader.string();
+          continue;
+        case 2:
+          if (tag !== 18) {
+            break;
+          }
+
+          message.description = reader.string();
+          continue;
+        case 3:
+          if (tag !== 26) {
+            break;
+          }
+
+          message.category = reader.string();
+          continue;
+        case 4:
+          if (tag !== 34) {
+            break;
+          }
+
+          message.inputs.push(NodeDefinition_InputDef.decode(reader, reader.uint32()));
+          continue;
+        case 5:
+          if (tag !== 42) {
+            break;
+          }
+
+          message.outputs.push(NodeDefinition_OutputDef.decode(reader, reader.uint32()));
+          continue;
+        case 6:
+          if (tag !== 48) {
+            break;
+          }
+
+          message.output_node = reader.bool();
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  create(base?: DeepPartial<NodeDefinition>): NodeDefinition {
+    return NodeDefinition.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<NodeDefinition>): NodeDefinition {
+    const message = createBaseNodeDefinition();
+    message.display_name = object.display_name ?? "";
+    message.description = object.description ?? "";
+    message.category = object.category ?? "";
+    message.inputs = object.inputs?.map((e) => NodeDefinition_InputDef.fromPartial(e)) || [];
+    message.outputs = object.outputs?.map((e) => NodeDefinition_OutputDef.fromPartial(e)) || [];
+    message.output_node = object.output_node ?? false;
+    return message;
+  },
+};
+
+function createBaseNodeDefinition_InputDef(): NodeDefinition_InputDef {
+  return { label: "", edge_type: "", spec: undefined };
+}
+
+export const NodeDefinition_InputDef = {
+  encode(message: NodeDefinition_InputDef, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.label !== "") {
+      writer.uint32(10).string(message.label);
+    }
+    if (message.edge_type !== "") {
+      writer.uint32(18).string(message.edge_type);
+    }
+    if (message.spec !== undefined) {
+      Struct.encode(Struct.wrap(message.spec), writer.uint32(26).fork()).ldelim();
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): NodeDefinition_InputDef {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseNodeDefinition_InputDef();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.label = reader.string();
+          continue;
+        case 2:
+          if (tag !== 18) {
+            break;
+          }
+
+          message.edge_type = reader.string();
+          continue;
+        case 3:
+          if (tag !== 26) {
+            break;
+          }
+
+          message.spec = Struct.unwrap(Struct.decode(reader, reader.uint32()));
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  create(base?: DeepPartial<NodeDefinition_InputDef>): NodeDefinition_InputDef {
+    return NodeDefinition_InputDef.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<NodeDefinition_InputDef>): NodeDefinition_InputDef {
+    const message = createBaseNodeDefinition_InputDef();
+    message.label = object.label ?? "";
+    message.edge_type = object.edge_type ?? "";
+    message.spec = object.spec ?? undefined;
+    return message;
+  },
+};
+
+function createBaseNodeDefinition_OutputDef(): NodeDefinition_OutputDef {
+  return { label: "", edge_type: "" };
+}
+
+export const NodeDefinition_OutputDef = {
+  encode(message: NodeDefinition_OutputDef, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.label !== "") {
+      writer.uint32(10).string(message.label);
+    }
+    if (message.edge_type !== "") {
+      writer.uint32(18).string(message.edge_type);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): NodeDefinition_OutputDef {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseNodeDefinition_OutputDef();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.label = reader.string();
+          continue;
+        case 2:
+          if (tag !== 18) {
+            break;
+          }
+
+          message.edge_type = reader.string();
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  create(base?: DeepPartial<NodeDefinition_OutputDef>): NodeDefinition_OutputDef {
+    return NodeDefinition_OutputDef.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<NodeDefinition_OutputDef>): NodeDefinition_OutputDef {
+    const message = createBaseNodeDefinition_OutputDef();
+    message.label = object.label ?? "";
+    message.edge_type = object.edge_type ?? "";
+    return message;
+  },
+};
+
+function createBaseNodeDefs(): NodeDefs {
+  return { defs: {} };
+}
+
+export const NodeDefs = {
+  encode(message: NodeDefs, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    Object.entries(message.defs).forEach(([key, value]) => {
+      NodeDefs_DefsEntry.encode({ key: key as any, value }, writer.uint32(10).fork()).ldelim();
+    });
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): NodeDefs {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseNodeDefs();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          const entry1 = NodeDefs_DefsEntry.decode(reader, reader.uint32());
+          if (entry1.value !== undefined) {
+            message.defs[entry1.key] = entry1.value;
+          }
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  create(base?: DeepPartial<NodeDefs>): NodeDefs {
+    return NodeDefs.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<NodeDefs>): NodeDefs {
+    const message = createBaseNodeDefs();
+    message.defs = Object.entries(object.defs ?? {}).reduce<{ [key: string]: NodeDefinition }>((acc, [key, value]) => {
+      if (value !== undefined) {
+        acc[key] = NodeDefinition.fromPartial(value);
+      }
+      return acc;
+    }, {});
+    return message;
+  },
+};
+
+function createBaseNodeDefs_DefsEntry(): NodeDefs_DefsEntry {
+  return { key: "", value: undefined };
+}
+
+export const NodeDefs_DefsEntry = {
+  encode(message: NodeDefs_DefsEntry, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.key !== "") {
+      writer.uint32(10).string(message.key);
+    }
+    if (message.value !== undefined) {
+      NodeDefinition.encode(message.value, writer.uint32(18).fork()).ldelim();
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): NodeDefs_DefsEntry {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseNodeDefs_DefsEntry();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.key = reader.string();
+          continue;
+        case 2:
+          if (tag !== 18) {
+            break;
+          }
+
+          message.value = NodeDefinition.decode(reader, reader.uint32());
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  create(base?: DeepPartial<NodeDefs_DefsEntry>): NodeDefs_DefsEntry {
+    return NodeDefs_DefsEntry.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<NodeDefs_DefsEntry>): NodeDefs_DefsEntry {
+    const message = createBaseNodeDefs_DefsEntry();
+    message.key = object.key ?? "";
+    message.value = (object.value !== undefined && object.value !== null)
+      ? NodeDefinition.fromPartial(object.value)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseNodeDefRequest(): NodeDefRequest {
+  return { extension_ids: [] };
+}
+
+export const NodeDefRequest = {
+  encode(message: NodeDefRequest, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    for (const v of message.extension_ids) {
+      writer.uint32(10).string(v!);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): NodeDefRequest {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseNodeDefRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.extension_ids.push(reader.string());
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  create(base?: DeepPartial<NodeDefRequest>): NodeDefRequest {
+    return NodeDefRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<NodeDefRequest>): NodeDefRequest {
+    const message = createBaseNodeDefRequest();
+    message.extension_ids = object.extension_ids?.map((e) => e) || [];
+    return message;
+  },
+};
+
+function createBaseModels(): Models {
+  return { info: [] };
+}
+
+export const Models = {
+  encode(message: Models, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    for (const v of message.info) {
+      Models_ModelInfo.encode(v!, writer.uint32(10).fork()).ldelim();
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): Models {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseModels();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.info.push(Models_ModelInfo.decode(reader, reader.uint32()));
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  create(base?: DeepPartial<Models>): Models {
+    return Models.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<Models>): Models {
+    const message = createBaseModels();
+    message.info = object.info?.map((e) => Models_ModelInfo.fromPartial(e)) || [];
+    return message;
+  },
+};
+
+function createBaseModels_ModelInfo(): Models_ModelInfo {
+  return { blake3_hash: "", display_name: "" };
+}
+
+export const Models_ModelInfo = {
+  encode(message: Models_ModelInfo, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.blake3_hash !== "") {
+      writer.uint32(10).string(message.blake3_hash);
+    }
+    if (message.display_name !== "") {
+      writer.uint32(18).string(message.display_name);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): Models_ModelInfo {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseModels_ModelInfo();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.blake3_hash = reader.string();
+          continue;
+        case 2:
+          if (tag !== 18) {
+            break;
+          }
+
+          message.display_name = reader.string();
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  create(base?: DeepPartial<Models_ModelInfo>): Models_ModelInfo {
+    return Models_ModelInfo.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<Models_ModelInfo>): Models_ModelInfo {
+    const message = createBaseModels_ModelInfo();
+    message.blake3_hash = object.blake3_hash ?? "";
+    message.display_name = object.display_name ?? "";
+    return message;
+  },
+};
+
+function createBaseModelCatalog(): ModelCatalog {
+  return { models: {} };
+}
+
+export const ModelCatalog = {
+  encode(message: ModelCatalog, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    Object.entries(message.models).forEach(([key, value]) => {
+      ModelCatalog_ModelsEntry.encode({ key: key as any, value }, writer.uint32(10).fork()).ldelim();
+    });
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): ModelCatalog {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseModelCatalog();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          const entry1 = ModelCatalog_ModelsEntry.decode(reader, reader.uint32());
+          if (entry1.value !== undefined) {
+            message.models[entry1.key] = entry1.value;
+          }
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  create(base?: DeepPartial<ModelCatalog>): ModelCatalog {
+    return ModelCatalog.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<ModelCatalog>): ModelCatalog {
+    const message = createBaseModelCatalog();
+    message.models = Object.entries(object.models ?? {}).reduce<{ [key: string]: Models }>((acc, [key, value]) => {
+      if (value !== undefined) {
+        acc[key] = Models.fromPartial(value);
+      }
+      return acc;
+    }, {});
+    return message;
+  },
+};
+
+function createBaseModelCatalog_ModelsEntry(): ModelCatalog_ModelsEntry {
+  return { key: "", value: undefined };
+}
+
+export const ModelCatalog_ModelsEntry = {
+  encode(message: ModelCatalog_ModelsEntry, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.key !== "") {
+      writer.uint32(10).string(message.key);
+    }
+    if (message.value !== undefined) {
+      Models.encode(message.value, writer.uint32(18).fork()).ldelim();
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): ModelCatalog_ModelsEntry {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseModelCatalog_ModelsEntry();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.key = reader.string();
+          continue;
+        case 2:
+          if (tag !== 18) {
+            break;
+          }
+
+          message.value = Models.decode(reader, reader.uint32());
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  create(base?: DeepPartial<ModelCatalog_ModelsEntry>): ModelCatalog_ModelsEntry {
+    return ModelCatalog_ModelsEntry.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<ModelCatalog_ModelsEntry>): ModelCatalog_ModelsEntry {
+    const message = createBaseModelCatalog_ModelsEntry();
+    message.key = object.key ?? "";
+    message.value = (object.value !== undefined && object.value !== null)
+      ? Models.fromPartial(object.value)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseModelCatalogRequest(): ModelCatalogRequest {
+  return { architecture: [] };
+}
+
+export const ModelCatalogRequest = {
+  encode(message: ModelCatalogRequest, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    for (const v of message.architecture) {
+      writer.uint32(10).string(v!);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): ModelCatalogRequest {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseModelCatalogRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.architecture.push(reader.string());
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  create(base?: DeepPartial<ModelCatalogRequest>): ModelCatalogRequest {
+    return ModelCatalogRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<ModelCatalogRequest>): ModelCatalogRequest {
+    const message = createBaseModelCatalogRequest();
+    message.architecture = object.architecture?.map((e) => e) || [];
     return message;
   },
 };
@@ -1823,28 +2562,10 @@ export const ComfyDefinition = {
       responseStream: false,
       options: {},
     },
-    /** Cancels a specific job (regardless if it's running or queued) */
-    cancel: {
-      name: "Cancel",
-      requestType: CancelJob,
-      requestStream: false,
-      responseType: Empty,
-      responseStream: false,
-      options: {},
-    },
-    /** Cancels all queued jobs owned by the user in a given session-id */
-    purgeQueue: {
-      name: "PurgeQueue",
-      requestType: PurgeRoomQueue,
-      requestStream: false,
-      responseType: Empty,
-      responseStream: false,
-      options: {},
-    },
     /** Server-side stream of all jobs in a given session-id */
-    streamRoom: {
-      name: "StreamRoom",
-      requestType: RoomStreamRequest,
+    streamSession: {
+      name: "StreamSession",
+      requestType: StreamSessionRequest,
       requestStream: false,
       responseType: ComfyMessage,
       responseStream: true,
@@ -1853,10 +2574,70 @@ export const ComfyDefinition = {
     /** Server-side stream of a specific job-id */
     streamJob: {
       name: "StreamJob",
-      requestType: JobStreamRequest,
+      requestType: StreamJobRequest,
       requestStream: false,
       responseType: ComfyMessage,
       responseStream: true,
+      options: {},
+    },
+    /**
+     * Cancels a specific job (regardless if it's running or queued)
+     * This is a combination of 'delete' and 'interrupt' from ComfyUI.
+     */
+    cancelJob: {
+      name: "CancelJob",
+      requestType: JobId,
+      requestStream: false,
+      responseType: Empty,
+      responseStream: false,
+      options: {},
+    },
+    /**
+     * Cancels all queued (pending) jobs in a given session-id
+     * ComfyUI calls this 'clear'
+     */
+    purgeSessionQueue: {
+      name: "PurgeSessionQueue",
+      requestType: SessionId,
+      requestStream: false,
+      responseType: Empty,
+      responseStream: false,
+      options: {},
+    },
+    /** Returns a list of outputs from a given session-id */
+    getSessionHistory: {
+      name: "GetSessionHistory",
+      requestType: SessionId,
+      requestStream: false,
+      responseType: SessionHistory,
+      responseStream: false,
+      options: {},
+    },
+    /** Removes the JobOutputs from memory for a given session-id */
+    clearSessionHistory: {
+      name: "ClearSessionHistory",
+      requestType: SessionId,
+      requestStream: false,
+      responseType: Empty,
+      responseStream: false,
+      options: {},
+    },
+    /** Gets the definitions of all nodes supported by this server */
+    getNodeDefinitions: {
+      name: "GetNodeDefinitions",
+      requestType: NodeDefRequest,
+      requestStream: false,
+      responseType: NodeDefs,
+      responseStream: false,
+      options: {},
+    },
+    /** Get models, grouped by architecture */
+    getModelCatalog: {
+      name: "GetModelCatalog",
+      requestType: ModelCatalogRequest,
+      requestStream: false,
+      responseType: ModelCatalog,
+      responseStream: false,
       options: {},
     },
   },
@@ -1867,20 +2648,37 @@ export interface ComfyServiceImplementation<CallContextExt = {}> {
   runWorkflow(request: ComfyRequest, context: CallContext & CallContextExt): Promise<DeepPartial<JobCreated>>;
   /** Queue a workflow and wait for the final outputs */
   runWorkflowSync(request: ComfyRequest, context: CallContext & CallContextExt): Promise<DeepPartial<JobOutput>>;
-  /** Cancels a specific job (regardless if it's running or queued) */
-  cancel(request: CancelJob, context: CallContext & CallContextExt): Promise<DeepPartial<Empty>>;
-  /** Cancels all queued jobs owned by the user in a given session-id */
-  purgeQueue(request: PurgeRoomQueue, context: CallContext & CallContextExt): Promise<DeepPartial<Empty>>;
   /** Server-side stream of all jobs in a given session-id */
-  streamRoom(
-    request: RoomStreamRequest,
+  streamSession(
+    request: StreamSessionRequest,
     context: CallContext & CallContextExt,
   ): ServerStreamingMethodResult<DeepPartial<ComfyMessage>>;
   /** Server-side stream of a specific job-id */
   streamJob(
-    request: JobStreamRequest,
+    request: StreamJobRequest,
     context: CallContext & CallContextExt,
   ): ServerStreamingMethodResult<DeepPartial<ComfyMessage>>;
+  /**
+   * Cancels a specific job (regardless if it's running or queued)
+   * This is a combination of 'delete' and 'interrupt' from ComfyUI.
+   */
+  cancelJob(request: JobId, context: CallContext & CallContextExt): Promise<DeepPartial<Empty>>;
+  /**
+   * Cancels all queued (pending) jobs in a given session-id
+   * ComfyUI calls this 'clear'
+   */
+  purgeSessionQueue(request: SessionId, context: CallContext & CallContextExt): Promise<DeepPartial<Empty>>;
+  /** Returns a list of outputs from a given session-id */
+  getSessionHistory(request: SessionId, context: CallContext & CallContextExt): Promise<DeepPartial<SessionHistory>>;
+  /** Removes the JobOutputs from memory for a given session-id */
+  clearSessionHistory(request: SessionId, context: CallContext & CallContextExt): Promise<DeepPartial<Empty>>;
+  /** Gets the definitions of all nodes supported by this server */
+  getNodeDefinitions(request: NodeDefRequest, context: CallContext & CallContextExt): Promise<DeepPartial<NodeDefs>>;
+  /** Get models, grouped by architecture */
+  getModelCatalog(
+    request: ModelCatalogRequest,
+    context: CallContext & CallContextExt,
+  ): Promise<DeepPartial<ModelCatalog>>;
 }
 
 export interface ComfyClient<CallOptionsExt = {}> {
@@ -1888,20 +2686,37 @@ export interface ComfyClient<CallOptionsExt = {}> {
   runWorkflow(request: DeepPartial<ComfyRequest>, options?: CallOptions & CallOptionsExt): Promise<JobCreated>;
   /** Queue a workflow and wait for the final outputs */
   runWorkflowSync(request: DeepPartial<ComfyRequest>, options?: CallOptions & CallOptionsExt): Promise<JobOutput>;
-  /** Cancels a specific job (regardless if it's running or queued) */
-  cancel(request: DeepPartial<CancelJob>, options?: CallOptions & CallOptionsExt): Promise<Empty>;
-  /** Cancels all queued jobs owned by the user in a given session-id */
-  purgeQueue(request: DeepPartial<PurgeRoomQueue>, options?: CallOptions & CallOptionsExt): Promise<Empty>;
   /** Server-side stream of all jobs in a given session-id */
-  streamRoom(
-    request: DeepPartial<RoomStreamRequest>,
+  streamSession(
+    request: DeepPartial<StreamSessionRequest>,
     options?: CallOptions & CallOptionsExt,
   ): AsyncIterable<ComfyMessage>;
   /** Server-side stream of a specific job-id */
   streamJob(
-    request: DeepPartial<JobStreamRequest>,
+    request: DeepPartial<StreamJobRequest>,
     options?: CallOptions & CallOptionsExt,
   ): AsyncIterable<ComfyMessage>;
+  /**
+   * Cancels a specific job (regardless if it's running or queued)
+   * This is a combination of 'delete' and 'interrupt' from ComfyUI.
+   */
+  cancelJob(request: DeepPartial<JobId>, options?: CallOptions & CallOptionsExt): Promise<Empty>;
+  /**
+   * Cancels all queued (pending) jobs in a given session-id
+   * ComfyUI calls this 'clear'
+   */
+  purgeSessionQueue(request: DeepPartial<SessionId>, options?: CallOptions & CallOptionsExt): Promise<Empty>;
+  /** Returns a list of outputs from a given session-id */
+  getSessionHistory(request: DeepPartial<SessionId>, options?: CallOptions & CallOptionsExt): Promise<SessionHistory>;
+  /** Removes the JobOutputs from memory for a given session-id */
+  clearSessionHistory(request: DeepPartial<SessionId>, options?: CallOptions & CallOptionsExt): Promise<Empty>;
+  /** Gets the definitions of all nodes supported by this server */
+  getNodeDefinitions(request: DeepPartial<NodeDefRequest>, options?: CallOptions & CallOptionsExt): Promise<NodeDefs>;
+  /** Get models, grouped by architecture */
+  getModelCatalog(
+    request: DeepPartial<ModelCatalogRequest>,
+    options?: CallOptions & CallOptionsExt,
+  ): Promise<ModelCatalog>;
 }
 
 type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;

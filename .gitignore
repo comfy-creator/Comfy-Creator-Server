@@ -16,10 +16,11 @@ venv/
 !/web/extensions/core/
 /tests-ui/data/object_info.json
 /user/
+*error.log
 
-node_modules/
+**/node_modules/
 .env.*
-!.env.example
+!.env.*example
 
 # Build dir
-/web/
+**/dist/

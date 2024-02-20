@@ -1,8 +1,4 @@
-## ComfyTS
-
-## The most powerful and modular stable diffusion GUI and backend.
-
-![ComfyUI Screenshot](comfyui_screenshot.png)
+### Comfy Engine
 
 ComfyTS ("Comfy-The-Sequel" / "Comfy-TypeScript") is a fork of ComfyUI. It serves as the backend for [void.tech](https://void.tech). Project goals:
 
@@ -10,28 +6,44 @@ ComfyTS ("Comfy-The-Sequel" / "Comfy-TypeScript") is a fork of ComfyUI. It serve
 - Adapt ComfyUI to work in a serverless, multi-user environment more easily
 - Maintain compatability with the existing ComfyUI ecosystem of custom-nodes and workflows
 
-### Docker Instructions:
+### Requirements
 
-<<<<<<< HEAD
+You need the following installed locally: 
+
+- Python
+- A javascript package manager: yarn, npm, or pnpm
+
+### How to Run
+
+First git-clone this repo, then run:
+
+`python start.py`
+
+After installing npm-dependencies and building the React app, you'll be given the option to select either a 'local' or 'remote' server.
+
+- Local: a local server will be started on port 8188 on your machine, utilizing your own GPU (or CPU if none is found) to run inference requests.
+- Rmote: you'll be prompted to login to void.tech to obtain an API-key. The React app will run inference requests on void.tech's remote GPUs.
+
+Either way, to view the React app open your browser at `localhost:8188`.
+
+### Running with Docker Instead:
+
+If you'd prefer to use Docker instead, you can.
 
 - Start your docker daemon, then in the root folder run the build command:
 
-  # `docker build -t voidtech0/comfy-ts:0.1.0 .`
+  `docker build -t voidtech0/comfy-ts:0.1.0 .`
 
 - Start your docker daemon, or install Docker if you don't already have it.
 - In the root of this repo, run the build command:
 
   `docker build -t voidtech0/comfy-ts:0.1.2 .`
 
-  > > > > > > > build-test
-
 Note that the docker-build does not copy any of the models into the docker-image, which would bloat the image-size. Instead, it expects to load the models from an external filesystem upon startup.
 
 - `docker run -it --name (???) --gpus all -p 8188:8188 -v "$(pwd)"/storage:(???)`
 
 ### Headless ComfyTS
-
-<<<<<<< HEAD
 
 - https://hub.docker.com/r/yanwk/comfyui-boot
 - https://hub.docker.com/r/universonic/stable-diffusion-webui
@@ -40,10 +52,14 @@ Note that the docker-build does not copy any of the models into the docker-image
 - Run `docker build -f Dockerfile.headless -t voidtech0/comfy-ts:0.1.2-headless .` in order to build ComfyTS in headless mode; this will not build and copy over any UI-components, making for a smaller docker-image. This is useful when running ComfyTS purely as a backend API in a cloud-environment.
   > > > > > > > build-test
 
+<<<<<<< HEAD
 ### Other ComfyUI docker images
+=======
+>>>>>>> comfy_ui/master
 
 Check these out as alternative builds if you don't like ComfyTS' build:
 
+<<<<<<< HEAD
 - https://hub.docker.com/r/yanwk/comfyui-boot
 - https://hub.docker.com/r/universonic/stable-diffusion-webui
 - https://hub.docker.com/r/ashleykza/stable-diffusion-webui
@@ -56,6 +72,13 @@ Check these out as alternative builds if you don't like ComfyTS' build:
 - We probably won't need sym-links and extra-model paths anymore to be honest; we can build those into comfy-ts directly.
 - Stop custom nodes from downloading external files and doing pip-install at runtime (on startup). We should ensure that's all done at build-time.
 - NFS sym-links: all of ComfyUI's folders (/input, /output, /temp, /models) should be symlinked to an NFS drive, so that they can be shared amongst workers.
+=======
+```pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/rocm5.7```
+
+This is the command to install the nightly with ROCm 6.0 which might have some performance improvements:
+
+```pip install --pre torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/rocm6.0```
+>>>>>>> comfy_ui/master
 
 ### General To Do:
 
@@ -65,7 +88,11 @@ Check these out as alternative builds if you don't like ComfyTS' build:
 
 ### Future
 
+<<<<<<< HEAD
 - We'll need to update the ui-tests, so that they work with importing Litegraph as a library rather than assuming it exists already in its execution context.
+=======
+This is the command to install pytorch nightly instead which might have performance improvements:
+>>>>>>> comfy_ui/master
 
 ### Building the UI
 
@@ -90,3 +117,19 @@ If you'd be interested in licensing this commercially, message me at paul@fidika
 ### List of Changes
 
 - (everything changed from ComfyUI...)
+
+### To Fix
+
+- For now, I had to comment-out the the logging settings option
+
+### Comfy Creator Extensions
+
+Comfy Creator is designed to be extensible; anyone can build and publish an extensions. Terminology:
+
+- Extension: a pip-package or git-repo that extends functionality
+
+- Custom Nodes: a new node-type registered with LiteGraph; either by defining it in the the server (python) or by the front-end (Tyepscript / JS).. After being registered, it can be instantiated as needed.
+
+- Custom Widgets: widgets are input boxes that exist inside of nodes; they are a concept handled by LiteGraph. You can register new widget-types with LiteGraph.
+
+- Plugin: custom code that runs in the front-end (client). Extensions can have many plugins.

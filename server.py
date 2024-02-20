@@ -31,6 +31,7 @@ import comfy.utils
 import comfy.model_management
 
 from app.user_manager import UserManager
+from static_file_server import serve_react_app
 
 class BinaryEventTypes:
     PREVIEW_IMAGE = 1
@@ -88,7 +89,7 @@ class PromptServer():
         self.app = web.Application(client_max_size=max_upload_size, middlewares=middlewares)
         self.sockets = dict()
         self.web_root = os.path.join(os.path.dirname(
-            os.path.realpath(__file__)), "web")
+            os.path.realpath(__file__)), "web/dist")
         routes = web.RouteTableDef()
         self.routes = routes
         self.last_node_id = None
@@ -131,7 +132,8 @@ class PromptServer():
         def get_embeddings(self):
             embeddings = folder_paths.get_filename_list("embeddings")
             return web.json_response(list(map(lambda a: os.path.splitext(a)[0], embeddings)))
-
+        
+        # Returns relative paths where extensions (as static files) can be loaded from
         @routes.get("/extensions")
         async def get_extensions(request):
             files = glob.glob(os.path.join(
@@ -536,15 +538,17 @@ class PromptServer():
     def add_routes(self):
         self.user_manager.add_routes(self.routes)
         self.app.add_routes(self.routes)
-
+        
+        # TO DO: we may change the way we serve the extensions
         for name, dir in nodes.EXTENSION_WEB_DIRS.items():
             self.app.add_routes([
                 web.static('/extensions/' + urllib.parse.quote(name), dir, follow_symlinks=True),
             ])
-
-        self.app.add_routes([
-            web.static('/', self.web_root, follow_symlinks=True),
-        ])
+            
+        serve_react_app(self.app, self.web_root, f"http://localhost:{args.port}", 'ws')
+        # self.app.add_routes([
+        #     web.static('/', self.web_root, follow_symlinks=True),
+        # ])
 
     def get_queue_info(self):
         prompt_info = {}
@@ -632,8 +636,6 @@ class PromptServer():
         site = web.TCPSite(runner, address, port)
         await site.start()
 
-        if address == '':
-            address = '0.0.0.0'
         if verbose:
             print("Starting server\n")
             print("To see the GUI go to: http://{}:{}".format(address, port))

@@ -1,4 +1,4 @@
-### Comfy Engine
+### Comfy Creator Server
 
 ComfyTS ("Comfy-The-Sequel" / "Comfy-TypeScript") is a fork of ComfyUI. It serves as the backend for [void.tech](https://void.tech). Project goals:
 
@@ -52,10 +52,7 @@ Note that the docker-build does not copy any of the models into the docker-image
 - Run `docker build -f Dockerfile.headless -t voidtech0/comfy-ts:0.1.2-headless .` in order to build ComfyTS in headless mode; this will not build and copy over any UI-components, making for a smaller docker-image. This is useful when running ComfyTS purely as a backend API in a cloud-environment.
   > > > > > > > build-test
 
-<<<<<<< HEAD
 ### Other ComfyUI docker images
-=======
->>>>>>> comfy_ui/master
 
 Check these out as alternative builds if you don't like ComfyTS' build:
 
@@ -65,7 +62,99 @@ Check these out as alternative builds if you don't like ComfyTS' build:
 - https://hub.docker.com/r/ashleykza/stable-diffusion-webui
 - https://github.com/ai-dock/comfyui
 
+<<<<<<< HEAD
 ### Docker To Do:
+=======
+## Features
+- Nodes/graph/flowchart interface to experiment and create complex Stable Diffusion workflows without needing to code anything.
+- Fully supports SD1.x, SD2.x, [SDXL](https://comfyanonymous.github.io/ComfyUI_examples/sdxl/), [Stable Video Diffusion](https://comfyanonymous.github.io/ComfyUI_examples/video/) and [Stable Cascade](https://comfyanonymous.github.io/ComfyUI_examples/stable_cascade/)
+- Asynchronous Queue system
+- Many optimizations: Only re-executes the parts of the workflow that changes between executions.
+- Command line option: ```--lowvram``` to make it work on GPUs with less than 3GB vram (enabled automatically on GPUs with low vram)
+- Works even if you don't have a GPU with: ```--cpu``` (slow)
+- Can load ckpt, safetensors and diffusers models/checkpoints. Standalone VAEs and CLIP models.
+- Embeddings/Textual inversion
+- [Loras (regular, locon and loha)](https://comfyanonymous.github.io/ComfyUI_examples/lora/)
+- [Hypernetworks](https://comfyanonymous.github.io/ComfyUI_examples/hypernetworks/)
+- Loading full workflows (with seeds) from generated PNG files.
+- Saving/Loading workflows as Json files.
+- Nodes interface can be used to create complex workflows like one for [Hires fix](https://comfyanonymous.github.io/ComfyUI_examples/2_pass_txt2img/) or much more advanced ones.
+- [Area Composition](https://comfyanonymous.github.io/ComfyUI_examples/area_composition/)
+- [Inpainting](https://comfyanonymous.github.io/ComfyUI_examples/inpaint/) with both regular and inpainting models.
+- [ControlNet and T2I-Adapter](https://comfyanonymous.github.io/ComfyUI_examples/controlnet/)
+- [Upscale Models (ESRGAN, ESRGAN variants, SwinIR, Swin2SR, etc...)](https://comfyanonymous.github.io/ComfyUI_examples/upscale_models/)
+- [unCLIP Models](https://comfyanonymous.github.io/ComfyUI_examples/unclip/)
+- [GLIGEN](https://comfyanonymous.github.io/ComfyUI_examples/gligen/)
+- [Model Merging](https://comfyanonymous.github.io/ComfyUI_examples/model_merging/)
+- [LCM models and Loras](https://comfyanonymous.github.io/ComfyUI_examples/lcm/)
+- [SDXL Turbo](https://comfyanonymous.github.io/ComfyUI_examples/sdturbo/)
+- Latent previews with [TAESD](#how-to-show-high-quality-previews)
+- Starts up very fast.
+- Works fully offline: will never download anything.
+- [Config file](extra_model_paths.yaml.example) to set the search paths for models.
+
+Workflow examples can be found on the [Examples page](https://comfyanonymous.github.io/ComfyUI_examples/)
+
+## Shortcuts
+
+| Keybind                   | Explanation                                                                                                        |
+|---------------------------|--------------------------------------------------------------------------------------------------------------------|
+| Ctrl + Enter              | Queue up current graph for generation                                                                              |
+| Ctrl + Shift + Enter      | Queue up current graph as first for generation                                                                     |
+| Ctrl + Z/Ctrl + Y         | Undo/Redo                                                                                                          |
+| Ctrl + S                  | Save workflow                                                                                                      |
+| Ctrl + O                  | Load workflow                                                                                                      |
+| Ctrl + A                  | Select all nodes                                                                                                   |
+| Alt + C                   | Collapse/uncollapse selected nodes                                                                                 |
+| Ctrl + M                  | Mute/unmute selected nodes                                                                                         |
+| Ctrl + B                  | Bypass selected nodes (acts like the node was removed from the graph and the wires reconnected through)            |
+| Delete/Backspace          | Delete selected nodes                                                                                              |
+| Ctrl + Delete/Backspace   | Delete the current graph                                                                                           |
+| Space                     | Move the canvas around when held and moving the cursor                                                             |
+| Ctrl/Shift + Click        | Add clicked node to selection                                                                                      |
+| Ctrl + C/Ctrl + V         | Copy and paste selected nodes (without maintaining connections to outputs of unselected nodes)                     |
+| Ctrl + C/Ctrl + Shift + V | Copy and paste selected nodes (maintaining connections from outputs of unselected nodes to inputs of pasted nodes) |
+| Shift + Drag              | Move multiple selected nodes at the same time                                                                      |
+| Ctrl + D                  | Load default graph                                                                                                 |
+| Q                         | Toggle visibility of the queue                                                                                     |
+| H                         | Toggle visibility of history                                                                                       |
+| R                         | Refresh graph                                                                                                      |
+| Double-Click LMB          | Open node quick search palette                                                                                     |
+
+Ctrl can also be replaced with Cmd instead for macOS users
+
+# Installing
+
+## Windows
+
+There is a portable standalone build for Windows that should work for running on Nvidia GPUs or for running on your CPU only on the [releases page](https://github.com/comfyanonymous/ComfyUI/releases).
+
+### [Direct link to download](https://github.com/comfyanonymous/ComfyUI/releases/download/latest/ComfyUI_windows_portable_nvidia_cu121_or_cpu.7z)
+
+Simply download, extract with [7-Zip](https://7-zip.org) and run. Make sure you put your Stable Diffusion checkpoints/models (the huge ckpt/safetensors files) in: ComfyUI\models\checkpoints
+
+If you have trouble extracting it, right click the file -> properties -> unblock
+
+#### How do I share models between another UI and ComfyUI?
+
+See the [Config file](extra_model_paths.yaml.example) to set the search paths for models. In the standalone windows build you can find this file in the ComfyUI directory. Rename this file to extra_model_paths.yaml and edit it with your favorite text editor.
+
+## Jupyter Notebook
+
+To run it on services like paperspace, kaggle or colab you can use my [Jupyter Notebook](notebooks/comfyui_colab.ipynb)
+
+## Manual Install (Windows, Linux)
+
+Git clone this repo.
+
+Put your SD checkpoints (the huge ckpt/safetensors files) in: models/checkpoints
+
+Put your VAE in: models/vae
+
+
+### AMD GPUs (Linux only)
+AMD users can install rocm and pytorch with pip if you don't have it already installed, this is the command to install the stable version:
+>>>>>>> 18c151b3e3f6838fab4028e7a8ba526e30e610d3
 
 - Make sure filesystem cache and sym-links are working.
 - Do we really need the extra_model_paths?

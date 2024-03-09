@@ -542,13 +542,20 @@ class PromptServer():
         # TO DO: we may change the way we serve the extensions
         for name, dir in nodes.EXTENSION_WEB_DIRS.items():
             self.app.add_routes([
-                web.static('/extensions/' + urllib.parse.quote(name), dir, follow_symlinks=True),
+                web.static('/extensions/' + urllib.parse.quote(name), dir),
             ])
+<<<<<<< HEAD
             
         serve_react_app(self.app, self.web_root, f"http://localhost:{args.port}", 'ws')
         # self.app.add_routes([
         #     web.static('/', self.web_root, follow_symlinks=True),
         # ])
+=======
+
+        self.app.add_routes([
+            web.static('/', self.web_root),
+        ])
+>>>>>>> comfyanonymous-master
 
     def get_queue_info(self):
         prompt_info = {}

@@ -56,13 +56,11 @@ Note that the docker-build does not copy any of the models into the docker-image
 
 Check these out as alternative builds if you don't like ComfyTS' build:
 
-<<<<<<< HEAD
 - https://hub.docker.com/r/yanwk/comfyui-boot
 - https://hub.docker.com/r/universonic/stable-diffusion-webui
 - https://hub.docker.com/r/ashleykza/stable-diffusion-webui
 - https://github.com/ai-dock/comfyui
 
-<<<<<<< HEAD
 ### Docker To Do:
 =======
 ## Features
@@ -92,69 +90,8 @@ Check these out as alternative builds if you don't like ComfyTS' build:
 - Starts up very fast.
 - Works fully offline: will never download anything.
 - [Config file](extra_model_paths.yaml.example) to set the search paths for models.
-
-Workflow examples can be found on the [Examples page](https://comfyanonymous.github.io/ComfyUI_examples/)
-
-## Shortcuts
-
-| Keybind                   | Explanation                                                                                                        |
-|---------------------------|--------------------------------------------------------------------------------------------------------------------|
-| Ctrl + Enter              | Queue up current graph for generation                                                                              |
-| Ctrl + Shift + Enter      | Queue up current graph as first for generation                                                                     |
-| Ctrl + Z/Ctrl + Y         | Undo/Redo                                                                                                          |
-| Ctrl + S                  | Save workflow                                                                                                      |
-| Ctrl + O                  | Load workflow                                                                                                      |
-| Ctrl + A                  | Select all nodes                                                                                                   |
-| Alt + C                   | Collapse/uncollapse selected nodes                                                                                 |
-| Ctrl + M                  | Mute/unmute selected nodes                                                                                         |
-| Ctrl + B                  | Bypass selected nodes (acts like the node was removed from the graph and the wires reconnected through)            |
-| Delete/Backspace          | Delete selected nodes                                                                                              |
-| Ctrl + Delete/Backspace   | Delete the current graph                                                                                           |
-| Space                     | Move the canvas around when held and moving the cursor                                                             |
-| Ctrl/Shift + Click        | Add clicked node to selection                                                                                      |
-| Ctrl + C/Ctrl + V         | Copy and paste selected nodes (without maintaining connections to outputs of unselected nodes)                     |
-| Ctrl + C/Ctrl + Shift + V | Copy and paste selected nodes (maintaining connections from outputs of unselected nodes to inputs of pasted nodes) |
-| Shift + Drag              | Move multiple selected nodes at the same time                                                                      |
-| Ctrl + D                  | Load default graph                                                                                                 |
-| Q                         | Toggle visibility of the queue                                                                                     |
-| H                         | Toggle visibility of history                                                                                       |
-| R                         | Refresh graph                                                                                                      |
-| Double-Click LMB          | Open node quick search palette                                                                                     |
-
-Ctrl can also be replaced with Cmd instead for macOS users
-
-# Installing
-
-## Windows
-
-There is a portable standalone build for Windows that should work for running on Nvidia GPUs or for running on your CPU only on the [releases page](https://github.com/comfyanonymous/ComfyUI/releases).
-
-### [Direct link to download](https://github.com/comfyanonymous/ComfyUI/releases/download/latest/ComfyUI_windows_portable_nvidia_cu121_or_cpu.7z)
-
-Simply download, extract with [7-Zip](https://7-zip.org) and run. Make sure you put your Stable Diffusion checkpoints/models (the huge ckpt/safetensors files) in: ComfyUI\models\checkpoints
-
-If you have trouble extracting it, right click the file -> properties -> unblock
-
-#### How do I share models between another UI and ComfyUI?
-
-See the [Config file](extra_model_paths.yaml.example) to set the search paths for models. In the standalone windows build you can find this file in the ComfyUI directory. Rename this file to extra_model_paths.yaml and edit it with your favorite text editor.
-
-## Jupyter Notebook
-
-To run it on services like paperspace, kaggle or colab you can use my [Jupyter Notebook](notebooks/comfyui_colab.ipynb)
-
-## Manual Install (Windows, Linux)
-
-Git clone this repo.
-
-Put your SD checkpoints (the huge ckpt/safetensors files) in: models/checkpoints
-
-Put your VAE in: models/vae
-
-
-### AMD GPUs (Linux only)
-AMD users can install rocm and pytorch with pip if you don't have it already installed, this is the command to install the stable version:
->>>>>>> 18c151b3e3f6838fab4028e7a8ba526e30e610d3
+=======
+### Docker Instructions:
 
 - Make sure filesystem cache and sym-links are working.
 - Do we really need the extra_model_paths?
@@ -167,7 +104,7 @@ AMD users can install rocm and pytorch with pip if you don't have it already ins
 This is the command to install the nightly with ROCm 6.0 which might have some performance improvements:
 
 ```pip install --pre torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/rocm6.0```
->>>>>>> comfy_ui/master
+
 
 ### General To Do:
 
@@ -177,11 +114,10 @@ This is the command to install the nightly with ROCm 6.0 which might have some p
 
 ### Future
 
-<<<<<<< HEAD
 - We'll need to update the ui-tests, so that they work with importing Litegraph as a library rather than assuming it exists already in its execution context.
 =======
 This is the command to install pytorch nightly instead which might have performance improvements:
->>>>>>> comfy_ui/master
+
 
 ### Building the UI
 
@@ -196,12 +132,6 @@ You normally shouldn't commit build-folders to your repo, but in this case it ma
 - Get rid of the clipspace properties / methods being marked as static; consider making them instance-properties instead (since they read and modify the 'app' singleton object). This would require replacing `ComfyApp.clipspace` references with `app.clipspace` references instead.
 
 - Consider making the extensions a static property of app; it might make sense to share them amongst instances of the app.
-
-### Non-Commercial License
-
-ComfyTS is released under a non-commercial license very similar to StabilityAI's SVD model license; ComfyTS is free for personal use, but not for commercial production. This balances our goals of being a profitable company at void.tech, while also allowing anyone to use our tools for free locally on their own computers.
-
-If you'd be interested in licensing this commercially, message me at paul@fidika.com. If comfyanonymous, pythongosssss, or anyone building an opensource custom-node on ComfyUI wants to use anything in this repo, they're certainly welcome to without even asking. Thanks guys.
 
 ### List of Changes
 
@@ -222,3 +152,6 @@ Comfy Creator is designed to be extensible; anyone can build and publish an exte
 - Custom Widgets: widgets are input boxes that exist inside of nodes; they are a concept handled by LiteGraph. You can register new widget-types with LiteGraph.
 
 - Plugin: custom code that runs in the front-end (client). Extensions can have many plugins.
+=======
+You normally shouldn't commit build-folders to your repo, but in this case it makes it easier for end-users to just git-clone this repo and start working, without the need to install any javascript-package mangers on their machine.
+

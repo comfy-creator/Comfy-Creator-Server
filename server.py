@@ -29,6 +29,7 @@ import mimetypes
 from comfy.cli_args import args
 import comfy.utils
 import comfy.model_management
+from custom_types import QueueJobRequest, WorkflowStep, SerializedGraph
 
 from app.user_manager import UserManager
 from static_file_server import serve_react_app
@@ -458,7 +459,7 @@ class PromptServer():
             print("got prompt")
             resp_code = 200
             out_string = ""
-            json_data =  await request.json()
+            json_data: QueueJobRequest =  await request.json()
             json_data = self.trigger_on_prompt(json_data)
 
             if "number" in json_data:
@@ -544,18 +545,15 @@ class PromptServer():
             self.app.add_routes([
                 web.static('/extensions/' + urllib.parse.quote(name), dir),
             ])
-<<<<<<< HEAD
             
         serve_react_app(self.app, self.web_root, f"http://localhost:{args.port}", 'ws')
         # self.app.add_routes([
         #     web.static('/', self.web_root, follow_symlinks=True),
         # ])
-=======
 
         self.app.add_routes([
             web.static('/', self.web_root),
         ])
->>>>>>> comfyanonymous-master
 
     def get_queue_info(self):
         prompt_info = {}

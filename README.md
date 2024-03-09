@@ -1,9 +1,11 @@
-### Comfy Creator Server
+### Comfy Inference API
 
-ComfyTS ("Comfy-The-Sequel" / "Comfy-TypeScript") is a fork of ComfyUI. It serves as the backend for [void.tech](https://void.tech). Project goals:
+This serves as the headless-backend for [ComfyCreator.com](https://comfycreator.com), (formerly [void.tech](https://void.tech)); it can be run locally with your own GPU, or in a serverless environment. This repo does not provide a UI.
 
-- Fix issues with ComfyUI
+Project goals:
+
 - Adapt ComfyUI to work in a serverless, multi-user environment more easily
+- Refactor ComfyUI to be easier to maintain
 - Maintain compatability with the existing ComfyUI ecosystem of custom-nodes and workflows
 
 ### Requirements
@@ -50,7 +52,6 @@ Note that the docker-build does not copy any of the models into the docker-image
 - https://hub.docker.com/r/ashleykza/stable-diffusion-webui
 - # https://github.com/ai-dock/comfyui
 - Run `docker build -f Dockerfile.headless -t voidtech0/comfy-ts:0.1.2-headless .` in order to build ComfyTS in headless mode; this will not build and copy over any UI-components, making for a smaller docker-image. This is useful when running ComfyTS purely as a backend API in a cloud-environment.
-  > > > > > > > build-test
 
 ### Other ComfyUI docker images
 
@@ -62,35 +63,9 @@ Check these out as alternative builds if you don't like ComfyTS' build:
 - https://github.com/ai-dock/comfyui
 
 ### Docker To Do:
-=======
-## Features
-- Nodes/graph/flowchart interface to experiment and create complex Stable Diffusion workflows without needing to code anything.
-- Fully supports SD1.x, SD2.x, [SDXL](https://comfyanonymous.github.io/ComfyUI_examples/sdxl/), [Stable Video Diffusion](https://comfyanonymous.github.io/ComfyUI_examples/video/) and [Stable Cascade](https://comfyanonymous.github.io/ComfyUI_examples/stable_cascade/)
-- Asynchronous Queue system
-- Many optimizations: Only re-executes the parts of the workflow that changes between executions.
-- Command line option: ```--lowvram``` to make it work on GPUs with less than 3GB vram (enabled automatically on GPUs with low vram)
-- Works even if you don't have a GPU with: ```--cpu``` (slow)
-- Can load ckpt, safetensors and diffusers models/checkpoints. Standalone VAEs and CLIP models.
-- Embeddings/Textual inversion
-- [Loras (regular, locon and loha)](https://comfyanonymous.github.io/ComfyUI_examples/lora/)
-- [Hypernetworks](https://comfyanonymous.github.io/ComfyUI_examples/hypernetworks/)
-- Loading full workflows (with seeds) from generated PNG files.
-- Saving/Loading workflows as Json files.
-- Nodes interface can be used to create complex workflows like one for [Hires fix](https://comfyanonymous.github.io/ComfyUI_examples/2_pass_txt2img/) or much more advanced ones.
-- [Area Composition](https://comfyanonymous.github.io/ComfyUI_examples/area_composition/)
-- [Inpainting](https://comfyanonymous.github.io/ComfyUI_examples/inpaint/) with both regular and inpainting models.
-- [ControlNet and T2I-Adapter](https://comfyanonymous.github.io/ComfyUI_examples/controlnet/)
-- [Upscale Models (ESRGAN, ESRGAN variants, SwinIR, Swin2SR, etc...)](https://comfyanonymous.github.io/ComfyUI_examples/upscale_models/)
-- [unCLIP Models](https://comfyanonymous.github.io/ComfyUI_examples/unclip/)
-- [GLIGEN](https://comfyanonymous.github.io/ComfyUI_examples/gligen/)
-- [Model Merging](https://comfyanonymous.github.io/ComfyUI_examples/model_merging/)
-- [LCM models and Loras](https://comfyanonymous.github.io/ComfyUI_examples/lcm/)
-- [SDXL Turbo](https://comfyanonymous.github.io/ComfyUI_examples/sdturbo/)
-- Latent previews with [TAESD](#how-to-show-high-quality-previews)
-- Starts up very fast.
-- Works fully offline: will never download anything.
-- [Config file](extra_model_paths.yaml.example) to set the search paths for models.
-=======
+
+-
+
 ### Docker Instructions:
 
 - Make sure filesystem cache and sym-links are working.
@@ -152,6 +127,6 @@ Comfy Creator is designed to be extensible; anyone can build and publish an exte
 - Custom Widgets: widgets are input boxes that exist inside of nodes; they are a concept handled by LiteGraph. You can register new widget-types with LiteGraph.
 
 - Plugin: custom code that runs in the front-end (client). Extensions can have many plugins.
-=======
+
 You normally shouldn't commit build-folders to your repo, but in this case it makes it easier for end-users to just git-clone this repo and start working, without the need to install any javascript-package mangers on their machine.
 

@@ -8,7 +8,7 @@ import google.protobuf.descriptor
 import google.protobuf.internal.containers
 import google.protobuf.internal.enum_type_wrapper
 import google.protobuf.message
-import google.struct_pb2
+import google.protobuf.struct_pb2
 import serialized_graph.v1_pb2
 import sys
 import typing
@@ -54,13 +54,13 @@ class WorkflowStep(google.protobuf.message.Message):
     INPUTS_FIELD_NUMBER: builtins.int
     class_type: builtins.str
     @property
-    def inputs(self) -> google.struct_pb2.Struct:
+    def inputs(self) -> google.protobuf.struct_pb2.Struct:
         """Inputs are too idiosyncratic to be typed specifically"""
     def __init__(
         self,
         *,
         class_type: builtins.str = ...,
-        inputs: google.struct_pb2.Struct | None = ...,
+        inputs: google.protobuf.struct_pb2.Struct | None = ...,
     ) -> None: ...
     def HasField(self, field_name: typing_extensions.Literal["inputs", b"inputs"]) -> builtins.bool: ...
     def ClearField(self, field_name: typing_extensions.Literal["class_type", b"class_type", "inputs", b"inputs"]) -> None: ...
@@ -427,13 +427,13 @@ class NodeDefinition(google.protobuf.message.Message):
         label: builtins.str
         edge_type: builtins.str
         @property
-        def spec(self) -> google.struct_pb2.Struct: ...
+        def spec(self) -> google.protobuf.struct_pb2.Struct: ...
         def __init__(
             self,
             *,
             label: builtins.str = ...,
             edge_type: builtins.str = ...,
-            spec: google.struct_pb2.Struct | None = ...,
+            spec: google.protobuf.struct_pb2.Struct | None = ...,
         ) -> None: ...
         def HasField(self, field_name: typing_extensions.Literal["spec", b"spec"]) -> builtins.bool: ...
         def ClearField(self, field_name: typing_extensions.Literal["edge_type", b"edge_type", "label", b"label", "spec", b"spec"]) -> None: ...

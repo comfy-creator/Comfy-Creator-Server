@@ -5,7 +5,7 @@ isort:skip_file
 import builtins
 import google.protobuf.descriptor
 import google.protobuf.message
-import google.struct_pb2
+import google.protobuf.struct_pb2
 import sys
 
 if sys.version_info >= (3, 8):
@@ -23,11 +23,11 @@ class SerializedGraph(google.protobuf.message.Message):
 
     DATA_FIELD_NUMBER: builtins.int
     @property
-    def data(self) -> google.struct_pb2.Struct: ...
+    def data(self) -> google.protobuf.struct_pb2.Struct: ...
     def __init__(
         self,
         *,
-        data: google.struct_pb2.Struct | None = ...,
+        data: google.protobuf.struct_pb2.Struct | None = ...,
     ) -> None: ...
     def HasField(self, field_name: typing_extensions.Literal["data", b"data"]) -> builtins.bool: ...
     def ClearField(self, field_name: typing_extensions.Literal["data", b"data"]) -> None: ...

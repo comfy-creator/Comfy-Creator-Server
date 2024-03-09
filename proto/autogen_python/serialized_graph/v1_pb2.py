@@ -12,30 +12,16 @@ from google.protobuf.internal import builder as _builder
 _sym_db = _symbol_database.Default()
 
 
-from google import any_pb2 as google_dot_any__pb2
+from google.protobuf import struct_pb2 as google_dot_protobuf_dot_struct__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x19serialized_graph.v1.proto\x12\x10serialized_graph\x1a\x10google/any.proto\"\x1f\n\x07Vector2\x12\t\n\x01x\x18\x01 \x01(\x02\x12\t\n\x01y\x18\x02 \x01(\x02\"5\n\x07Vector4\x12\t\n\x01x\x18\x01 \x01(\x02\x12\t\n\x01y\x18\x02 \x01(\x02\x12\t\n\x01z\x18\x03 \x01(\x02\x12\t\n\x01w\x18\x04 \x01(\x02\"\xd3\x03\n\x14SerializedLGraphNode\x12\n\n\x02id\x18\x01 \x01(\x05\x12\x0c\n\x04type\x18\x02 \x01(\t\x12&\n\x03pos\x18\x03 \x01(\x0b\x32\x19.serialized_graph.Vector2\x12\'\n\x04size\x18\x04 \x01(\x0b\x32\x19.serialized_graph.Vector2\x12#\n\x05\x66lags\x18\x05 \x01(\x0b\x32\x14.google.protobuf.Any\x12\x0c\n\x04mode\x18\x06 \x01(\t\x12$\n\x06inputs\x18\x07 \x03(\x0b\x32\x14.google.protobuf.Any\x12%\n\x07outputs\x18\x08 \x03(\x0b\x32\x14.google.protobuf.Any\x12\r\n\x05title\x18\t \x01(\t\x12J\n\nproperties\x18\n \x03(\x0b\x32\x36.serialized_graph.SerializedLGraphNode.PropertiesEntry\x12,\n\x0ewidgets_values\x18\x0b \x03(\x0b\x32\x14.google.protobuf.Any\x1aG\n\x0fPropertiesEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12#\n\x05value\x18\x02 \x01(\x0b\x32\x14.google.protobuf.Any:\x02\x38\x01\"p\n\x15SerializedLGraphGroup\x12\r\n\x05title\x18\x01 \x01(\t\x12+\n\x08\x62ounding\x18\x02 \x01(\x0b\x32\x19.serialized_graph.Vector4\x12\r\n\x05\x63olor\x18\x03 \x01(\t\x12\x0c\n\x04\x66ont\x18\x04 \x01(\t\"{\n\x04Link\x12\x16\n\x0esource_node_id\x18\x01 \x01(\x05\x12\x1a\n\x12source_output_slot\x18\x02 \x01(\x05\x12\x16\n\x0etarget_node_id\x18\x03 \x01(\x05\x12\x19\n\x11target_input_slot\x18\x04 \x01(\x05\x12\x0c\n\x04type\x18\x05 \x01(\t\"\x8b\x02\n\x0fSerializedGraph\x12\x14\n\x0clast_node_id\x18\x01 \x01(\x05\x12\x14\n\x0clast_link_id\x18\x02 \x01(\x05\x12\x35\n\x05nodes\x18\x03 \x03(\x0b\x32&.serialized_graph.SerializedLGraphNode\x12%\n\x05links\x18\x04 \x03(\x0b\x32\x16.serialized_graph.Link\x12\x37\n\x06groups\x18\x05 \x03(\x0b\x32\'.serialized_graph.SerializedLGraphGroup\x12$\n\x06\x63onfig\x18\x06 \x01(\x0b\x32\x14.google.protobuf.Any\x12\x0f\n\x07version\x18\x07 \x01(\tb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x19serialized_graph.v1.proto\x12\x10serialized_graph\x1a\x1cgoogle/protobuf/struct.proto\"8\n\x0fSerializedGraph\x12%\n\x04\x64\x61ta\x18\x01 \x01(\x0b\x32\x17.google.protobuf.Structb\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
 _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'serialized_graph.v1_pb2', _globals)
 if _descriptor._USE_C_DESCRIPTORS == False:
   DESCRIPTOR._options = None
-  _globals['_SERIALIZEDLGRAPHNODE_PROPERTIESENTRY']._options = None
-  _globals['_SERIALIZEDLGRAPHNODE_PROPERTIESENTRY']._serialized_options = b'8\001'
-  _globals['_VECTOR2']._serialized_start=65
-  _globals['_VECTOR2']._serialized_end=96
-  _globals['_VECTOR4']._serialized_start=98
-  _globals['_VECTOR4']._serialized_end=151
-  _globals['_SERIALIZEDLGRAPHNODE']._serialized_start=154
-  _globals['_SERIALIZEDLGRAPHNODE']._serialized_end=621
-  _globals['_SERIALIZEDLGRAPHNODE_PROPERTIESENTRY']._serialized_start=550
-  _globals['_SERIALIZEDLGRAPHNODE_PROPERTIESENTRY']._serialized_end=621
-  _globals['_SERIALIZEDLGRAPHGROUP']._serialized_start=623
-  _globals['_SERIALIZEDLGRAPHGROUP']._serialized_end=735
-  _globals['_LINK']._serialized_start=737
-  _globals['_LINK']._serialized_end=860
-  _globals['_SERIALIZEDGRAPH']._serialized_start=863
-  _globals['_SERIALIZEDGRAPH']._serialized_end=1130
+  _globals['_SERIALIZEDGRAPH']._serialized_start=77
+  _globals['_SERIALIZEDGRAPH']._serialized_end=133
 # @@protoc_insertion_point(module_scope)

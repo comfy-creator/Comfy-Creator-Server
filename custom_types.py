@@ -1,6 +1,6 @@
 from typing import TypedDict, Optional, Dict
-from autogen_python.comfy_request.v1_pb2 import ComfyRequest, JobSnapshot, WorkflowStep
-from autogen_python.serialized_graph.v1_pb2 import SerializedGraph
+from .proto.autogen_python.comfy_request.v1_pb2 import ComfyRequest, JobSnapshot, WorkflowStep
+from .proto.autogen_python.serialized_graph.v1_pb2 import SerializedGraph
 
 class ExtraPNGInfo(TypedDict):
     serializedGraph: Optional[SerializedGraph]

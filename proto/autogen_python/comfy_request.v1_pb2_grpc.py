@@ -3,11 +3,11 @@
 import grpc
 
 from comfy_request import v1_pb2 as comfy__request_dot_v1__pb2
-from google import empty_pb2 as google_dot_empty__pb2
+from google.protobuf import empty_pb2 as google_dot_protobuf_dot_empty__pb2
 
 
 class ComfyStub(object):
-    """====== Service Definition ======
+    """====== Service Definitions ======
 
     """
 
@@ -17,45 +17,20 @@ class ComfyStub(object):
         Args:
             channel: A grpc.Channel.
         """
-        self.RunWorkflow = channel.unary_unary(
-                '/comfy_request.v1.Comfy/RunWorkflow',
+        self.Run = channel.unary_unary(
+                '/comfy_request.v1.Comfy/Run',
                 request_serializer=comfy__request_dot_v1__pb2.ComfyRequest.SerializeToString,
-                response_deserializer=comfy__request_dot_v1__pb2.JobCreated.FromString,
+                response_deserializer=comfy__request_dot_v1__pb2.JobSnapshot.FromString,
                 )
-        self.RunWorkflowSync = channel.unary_unary(
-                '/comfy_request.v1.Comfy/RunWorkflowSync',
+        self.RunSync = channel.unary_stream(
+                '/comfy_request.v1.Comfy/RunSync',
                 request_serializer=comfy__request_dot_v1__pb2.ComfyRequest.SerializeToString,
                 response_deserializer=comfy__request_dot_v1__pb2.JobOutput.FromString,
                 )
-        self.StreamSession = channel.unary_stream(
-                '/comfy_request.v1.Comfy/StreamSession',
-                request_serializer=comfy__request_dot_v1__pb2.StreamSessionRequest.SerializeToString,
-                response_deserializer=comfy__request_dot_v1__pb2.ComfyMessage.FromString,
-                )
-        self.StreamJob = channel.unary_stream(
-                '/comfy_request.v1.Comfy/StreamJob',
-                request_serializer=comfy__request_dot_v1__pb2.StreamJobRequest.SerializeToString,
-                response_deserializer=comfy__request_dot_v1__pb2.ComfyMessage.FromString,
-                )
-        self.CancelJob = channel.unary_unary(
-                '/comfy_request.v1.Comfy/CancelJob',
+        self.GetJob = channel.unary_unary(
+                '/comfy_request.v1.Comfy/GetJob',
                 request_serializer=comfy__request_dot_v1__pb2.JobId.SerializeToString,
-                response_deserializer=google_dot_empty__pb2.Empty.FromString,
-                )
-        self.PurgeSessionQueue = channel.unary_unary(
-                '/comfy_request.v1.Comfy/PurgeSessionQueue',
-                request_serializer=comfy__request_dot_v1__pb2.SessionId.SerializeToString,
-                response_deserializer=google_dot_empty__pb2.Empty.FromString,
-                )
-        self.GetSessionHistory = channel.unary_unary(
-                '/comfy_request.v1.Comfy/GetSessionHistory',
-                request_serializer=comfy__request_dot_v1__pb2.SessionId.SerializeToString,
-                response_deserializer=comfy__request_dot_v1__pb2.SessionHistory.FromString,
-                )
-        self.ClearSessionHistory = channel.unary_unary(
-                '/comfy_request.v1.Comfy/ClearSessionHistory',
-                request_serializer=comfy__request_dot_v1__pb2.SessionId.SerializeToString,
-                response_deserializer=google_dot_empty__pb2.Empty.FromString,
+                response_deserializer=comfy__request_dot_v1__pb2.JobSnapshot.FromString,
                 )
         self.GetNodeDefinitions = channel.unary_unary(
                 '/comfy_request.v1.Comfy/GetNodeDefinitions',
@@ -67,77 +42,56 @@ class ComfyStub(object):
                 request_serializer=comfy__request_dot_v1__pb2.ModelCatalogRequest.SerializeToString,
                 response_deserializer=comfy__request_dot_v1__pb2.ModelCatalog.FromString,
                 )
+        self.SyncLocalFiles = channel.unary_stream(
+                '/comfy_request.v1.Comfy/SyncLocalFiles',
+                request_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
+                response_deserializer=comfy__request_dot_v1__pb2.LocalFiles.FromString,
+                )
 
 
 class ComfyServicer(object):
-    """====== Service Definition ======
+    """====== Service Definitions ======
 
     """
 
-    def RunWorkflow(self, request, context):
-        """Queue a workflow and receive the job id
+    def Run(self, request, context):
+        """Queue a workflow and receive the job id.
+        Results can be retrieved from the graph-id or via a webhook callback.
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
-    def RunWorkflowSync(self, request, context):
-        """Queue a workflow and wait for the final outputs
+    def RunSync(self, request, context):
+        """Queue a workflow and await its outputs (synchronous)
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
-    def StreamSession(self, request, context):
-        """Bidirectional stream of requests and final outputs
-        TO DO: implement in the future?
-        rpc StreamWorkflow(stream ComfyRequest) returns (stream ComfyMessage) {};
-
-        Server-side stream of all jobs in a given session-id
-        """
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
-    def StreamJob(self, request, context):
-        """Server-side stream of a specific job-id
-        """
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
-    def CancelJob(self, request, context):
-        """Cancels a specific job (regardless if it's running or queued)
-        This is a combination of 'delete' and 'interrupt' from ComfyUI.
-        """
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
-    def PurgeSessionQueue(self, request, context):
-        """Cancels all queued (pending) jobs in a given session-id
-        ComfyUI calls this 'clear'
-        """
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
-    def GetSessionHistory(self, request, context):
-        """Returns a list of outputs from a given session-id
-        """
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
-    def ClearSessionHistory(self, request, context):
-        """Removes the JobOutputs from memory for a given session-id
+    def GetJob(self, request, context):
+        """Looks up the most current job state
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
     def GetNodeDefinitions(self, request, context):
-        """Gets the definitions of all nodes supported by this server
+        """Cancels a specific job (regardless if it's running or queued)
+        This is a combination of 'delete' and 'interrupt' from ComfyUI.
+        rpc CancelJob (JobId) returns (google.protobuf.Empty) {};
+
+        Cancels all queued (pending) jobs in a given session-id that this user created
+        ComfyUI calls this 'clear'
+        rpc PurgeSessionQueue (SessionId) returns (google.protobuf.Empty) {};
+
+        Returns a list of outputs from a given user
+        rpc GetUserHistory (UserId) returns (UserHistory) {};
+
+        Removes the JobOutputs from memory for a given user
+        rpc ClearUserHistory (UserId) returns (google.protobuf.Empty) {};
+
+        Gets the definitions of all nodes supported by this server
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -150,48 +104,31 @@ class ComfyServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def SyncLocalFiles(self, request, context):
+        """Streams updates to local-files in realtime.
+        This is only used when running Comfy Creator with local files.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_ComfyServicer_to_server(servicer, server):
     rpc_method_handlers = {
-            'RunWorkflow': grpc.unary_unary_rpc_method_handler(
-                    servicer.RunWorkflow,
+            'Run': grpc.unary_unary_rpc_method_handler(
+                    servicer.Run,
                     request_deserializer=comfy__request_dot_v1__pb2.ComfyRequest.FromString,
-                    response_serializer=comfy__request_dot_v1__pb2.JobCreated.SerializeToString,
+                    response_serializer=comfy__request_dot_v1__pb2.JobSnapshot.SerializeToString,
             ),
-            'RunWorkflowSync': grpc.unary_unary_rpc_method_handler(
-                    servicer.RunWorkflowSync,
+            'RunSync': grpc.unary_stream_rpc_method_handler(
+                    servicer.RunSync,
                     request_deserializer=comfy__request_dot_v1__pb2.ComfyRequest.FromString,
                     response_serializer=comfy__request_dot_v1__pb2.JobOutput.SerializeToString,
             ),
-            'StreamSession': grpc.unary_stream_rpc_method_handler(
-                    servicer.StreamSession,
-                    request_deserializer=comfy__request_dot_v1__pb2.StreamSessionRequest.FromString,
-                    response_serializer=comfy__request_dot_v1__pb2.ComfyMessage.SerializeToString,
-            ),
-            'StreamJob': grpc.unary_stream_rpc_method_handler(
-                    servicer.StreamJob,
-                    request_deserializer=comfy__request_dot_v1__pb2.StreamJobRequest.FromString,
-                    response_serializer=comfy__request_dot_v1__pb2.ComfyMessage.SerializeToString,
-            ),
-            'CancelJob': grpc.unary_unary_rpc_method_handler(
-                    servicer.CancelJob,
+            'GetJob': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetJob,
                     request_deserializer=comfy__request_dot_v1__pb2.JobId.FromString,
-                    response_serializer=google_dot_empty__pb2.Empty.SerializeToString,
-            ),
-            'PurgeSessionQueue': grpc.unary_unary_rpc_method_handler(
-                    servicer.PurgeSessionQueue,
-                    request_deserializer=comfy__request_dot_v1__pb2.SessionId.FromString,
-                    response_serializer=google_dot_empty__pb2.Empty.SerializeToString,
-            ),
-            'GetSessionHistory': grpc.unary_unary_rpc_method_handler(
-                    servicer.GetSessionHistory,
-                    request_deserializer=comfy__request_dot_v1__pb2.SessionId.FromString,
-                    response_serializer=comfy__request_dot_v1__pb2.SessionHistory.SerializeToString,
-            ),
-            'ClearSessionHistory': grpc.unary_unary_rpc_method_handler(
-                    servicer.ClearSessionHistory,
-                    request_deserializer=comfy__request_dot_v1__pb2.SessionId.FromString,
-                    response_serializer=google_dot_empty__pb2.Empty.SerializeToString,
+                    response_serializer=comfy__request_dot_v1__pb2.JobSnapshot.SerializeToString,
             ),
             'GetNodeDefinitions': grpc.unary_unary_rpc_method_handler(
                     servicer.GetNodeDefinitions,
@@ -203,6 +140,11 @@ def add_ComfyServicer_to_server(servicer, server):
                     request_deserializer=comfy__request_dot_v1__pb2.ModelCatalogRequest.FromString,
                     response_serializer=comfy__request_dot_v1__pb2.ModelCatalog.SerializeToString,
             ),
+            'SyncLocalFiles': grpc.unary_stream_rpc_method_handler(
+                    servicer.SyncLocalFiles,
+                    request_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
+                    response_serializer=comfy__request_dot_v1__pb2.LocalFiles.SerializeToString,
+            ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
             'comfy_request.v1.Comfy', rpc_method_handlers)
@@ -211,12 +153,12 @@ def add_ComfyServicer_to_server(servicer, server):
 
  # This class is part of an EXPERIMENTAL API.
 class Comfy(object):
-    """====== Service Definition ======
+    """====== Service Definitions ======
 
     """
 
     @staticmethod
-    def RunWorkflow(request,
+    def Run(request,
             target,
             options=(),
             channel_credentials=None,
@@ -226,14 +168,14 @@ class Comfy(object):
             wait_for_ready=None,
             timeout=None,
             metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/comfy_request.v1.Comfy/RunWorkflow',
+        return grpc.experimental.unary_unary(request, target, '/comfy_request.v1.Comfy/Run',
             comfy__request_dot_v1__pb2.ComfyRequest.SerializeToString,
-            comfy__request_dot_v1__pb2.JobCreated.FromString,
+            comfy__request_dot_v1__pb2.JobSnapshot.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 
     @staticmethod
-    def RunWorkflowSync(request,
+    def RunSync(request,
             target,
             options=(),
             channel_credentials=None,
@@ -243,14 +185,14 @@ class Comfy(object):
             wait_for_ready=None,
             timeout=None,
             metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/comfy_request.v1.Comfy/RunWorkflowSync',
+        return grpc.experimental.unary_stream(request, target, '/comfy_request.v1.Comfy/RunSync',
             comfy__request_dot_v1__pb2.ComfyRequest.SerializeToString,
             comfy__request_dot_v1__pb2.JobOutput.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 
     @staticmethod
-    def StreamSession(request,
+    def GetJob(request,
             target,
             options=(),
             channel_credentials=None,
@@ -260,94 +202,9 @@ class Comfy(object):
             wait_for_ready=None,
             timeout=None,
             metadata=None):
-        return grpc.experimental.unary_stream(request, target, '/comfy_request.v1.Comfy/StreamSession',
-            comfy__request_dot_v1__pb2.StreamSessionRequest.SerializeToString,
-            comfy__request_dot_v1__pb2.ComfyMessage.FromString,
-            options, channel_credentials,
-            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
-
-    @staticmethod
-    def StreamJob(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_stream(request, target, '/comfy_request.v1.Comfy/StreamJob',
-            comfy__request_dot_v1__pb2.StreamJobRequest.SerializeToString,
-            comfy__request_dot_v1__pb2.ComfyMessage.FromString,
-            options, channel_credentials,
-            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
-
-    @staticmethod
-    def CancelJob(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/comfy_request.v1.Comfy/CancelJob',
+        return grpc.experimental.unary_unary(request, target, '/comfy_request.v1.Comfy/GetJob',
             comfy__request_dot_v1__pb2.JobId.SerializeToString,
-            google_dot_empty__pb2.Empty.FromString,
-            options, channel_credentials,
-            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
-
-    @staticmethod
-    def PurgeSessionQueue(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/comfy_request.v1.Comfy/PurgeSessionQueue',
-            comfy__request_dot_v1__pb2.SessionId.SerializeToString,
-            google_dot_empty__pb2.Empty.FromString,
-            options, channel_credentials,
-            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
-
-    @staticmethod
-    def GetSessionHistory(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/comfy_request.v1.Comfy/GetSessionHistory',
-            comfy__request_dot_v1__pb2.SessionId.SerializeToString,
-            comfy__request_dot_v1__pb2.SessionHistory.FromString,
-            options, channel_credentials,
-            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
-
-    @staticmethod
-    def ClearSessionHistory(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/comfy_request.v1.Comfy/ClearSessionHistory',
-            comfy__request_dot_v1__pb2.SessionId.SerializeToString,
-            google_dot_empty__pb2.Empty.FromString,
+            comfy__request_dot_v1__pb2.JobSnapshot.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 
@@ -382,5 +239,22 @@ class Comfy(object):
         return grpc.experimental.unary_unary(request, target, '/comfy_request.v1.Comfy/GetModelCatalog',
             comfy__request_dot_v1__pb2.ModelCatalogRequest.SerializeToString,
             comfy__request_dot_v1__pb2.ModelCatalog.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def SyncLocalFiles(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_stream(request, target, '/comfy_request.v1.Comfy/SyncLocalFiles',
+            google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
+            comfy__request_dot_v1__pb2.LocalFiles.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)

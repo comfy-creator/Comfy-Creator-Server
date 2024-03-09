@@ -12,12 +12,12 @@ from google.protobuf.internal import builder as _builder
 _sym_db = _symbol_database.Default()
 
 
-from google import struct_pb2 as google_dot_struct__pb2
-from google import empty_pb2 as google_dot_empty__pb2
+from google.protobuf import struct_pb2 as google_dot_protobuf_dot_struct__pb2
+from google.protobuf import empty_pb2 as google_dot_protobuf_dot_empty__pb2
 from serialized_graph import v1_pb2 as serialized__graph_dot_v1__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x16\x63omfy_request.v1.proto\x12\x10\x63omfy_request.v1\x1a\x13google/struct.proto\x1a\x12google/empty.proto\x1a\x19serialized_graph.v1.proto\"K\n\x0cWorkflowStep\x12\x12\n\nclass_type\x18\x01 \x01(\t\x12\'\n\x06inputs\x18\x02 \x01(\x0b\x32\x17.google.protobuf.Struct\"\xc3\x01\n\x0cWorkflowFile\x12\x11\n\tfile_hash\x18\x01 \x01(\t\x12\x11\n\tmime_type\x18\x02 \x01(\t\x12\x41\n\treference\x18\x03 \x01(\x0b\x32,.comfy_request.v1.WorkflowFile.FileReferenceH\x00\x12\x0e\n\x04\x64\x61ta\x18\x04 \x01(\x0cH\x00\x1a-\n\rFileReference\x12\x0b\n\x03url\x18\x01 \x01(\t\x12\x0f\n\x07is_temp\x18\x02 \x01(\x08\x42\x0b\n\tfile_data\"B\n\x0cOutputConfig\x12\x14\n\x0csave_outputs\x18\x01 \x01(\x08\x12\x1c\n\x14send_latent_previews\x18\x02 \x01(\x08\"\xc6\x03\n\x0c\x43omfyRequest\x12>\n\x08workflow\x18\x01 \x03(\x0b\x32,.comfy_request.v1.ComfyRequest.WorkflowEntry\x12@\n\x10serialized_graph\x18\x02 \x01(\x0b\x32!.serialized_graph.SerializedGraphH\x00\x88\x01\x01\x12\x33\n\x0binput_files\x18\x03 \x03(\x0b\x32\x1e.comfy_request.v1.WorkflowFile\x12\x35\n\routput_config\x18\x04 \x01(\x0b\x32\x1e.comfy_request.v1.OutputConfig\x12!\n\x14worker_wait_duration\x18\x05 \x01(\rH\x01\x88\x01\x01\x12\x17\n\nsession_id\x18\x06 \x01(\tH\x02\x88\x01\x01\x1aO\n\rWorkflowEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12-\n\x05value\x18\x02 \x01(\x0b\x32\x1e.comfy_request.v1.WorkflowStep:\x02\x38\x01\x42\x13\n\x11_serialized_graphB\x17\n\x15_worker_wait_durationB\r\n\x0b_session_id\"b\n\nJobCreated\x12\x0e\n\x06job_id\x18\x01 \x01(\t\x12\x12\n\nsession_id\x18\x02 \x01(\t\x12\x15\n\rqueue_seconds\x18\x03 \x01(\r\x12\x19\n\x11\x65xecution_seconds\x18\x04 \x01(\r\"^\n\tJobOutput\x12\x0e\n\x06job_id\x18\x01 \x01(\t\x12\x12\n\nsession_id\x18\x02 \x01(\t\x12-\n\x05\x66iles\x18\x03 \x03(\x0b\x32\x1e.comfy_request.v1.WorkflowFile\">\n\x0eSessionHistory\x12,\n\x07outputs\x18\x01 \x03(\x0b\x32\x1b.comfy_request.v1.JobOutput\"\xc3\n\n\x0c\x43omfyMessage\x12\x0e\n\x06job_id\x18\x01 \x01(\t\x12\x0f\n\x07user_id\x18\x02 \x01(\t\x12\x42\n\x0cqueue_status\x18\x03 \x01(\x0b\x32*.comfy_request.v1.ComfyMessage.QueueStatusH\x00\x12H\n\x0f\x65xecution_start\x18\x04 \x01(\x0b\x32-.comfy_request.v1.ComfyMessage.ExecutionStartH\x00\x12=\n\texecuting\x18\x05 \x01(\x0b\x32(.comfy_request.v1.ComfyMessage.ExecutingH\x00\x12;\n\x08progress\x18\x06 \x01(\x0b\x32\'.comfy_request.v1.ComfyMessage.ProgressH\x00\x12H\n\x0f\x65xecution_error\x18\x07 \x01(\x0b\x32-.comfy_request.v1.ComfyMessage.ExecutionErrorH\x00\x12T\n\x15\x65xecution_interrupted\x18\x08 \x01(\x0b\x32\x33.comfy_request.v1.ComfyMessage.ExecutionInterruptedH\x00\x12J\n\x10\x65xecution_cached\x18\t \x01(\x0b\x32..comfy_request.v1.ComfyMessage.ExecutionCachedH\x00\x12\x37\n\x06output\x18\n \x01(\x0b\x32%.comfy_request.v1.ComfyMessage.OutputH\x00\x12\x46\n\x0e\x63ustom_message\x18\x0b \x01(\x0b\x32,.comfy_request.v1.ComfyMessage.CustomMessageH\x00\x1a@\n\x0bQueueStatus\x12\x10\n\x03sid\x18\x01 \x01(\tH\x00\x88\x01\x01\x12\x17\n\x0fqueue_remaining\x18\x02 \x01(\rB\x06\n\x04_sid\x1a\x10\n\x0e\x45xecutionStart\x1a\x1c\n\tExecuting\x12\x0f\n\x07node_id\x18\x01 \x01(\t\x1a&\n\x08Progress\x12\x0b\n\x03max\x18\x01 \x01(\r\x12\r\n\x05value\x18\x02 \x01(\r\x1a\xed\x01\n\x0e\x45xecutionError\x12.\n\rcurrentInputs\x18\x01 \x01(\x0b\x32\x17.google.protobuf.Struct\x12/\n\x0e\x63urrentOutputs\x18\x02 \x01(\x0b\x32\x17.google.protobuf.Struct\x12\x19\n\x11\x65xecution_message\x18\x03 \x01(\t\x12\x16\n\x0e\x65xception_type\x18\x04 \x01(\t\x12\x10\n\x08\x65xecuted\x18\x05 \x03(\t\x12\x0f\n\x07node_id\x18\x06 \x01(\t\x12\x11\n\tnode_type\x18\x07 \x01(\t\x12\x11\n\ttraceback\x18\x08 \x03(\t\x1aL\n\x14\x45xecutionInterrupted\x12\x10\n\x08\x65xecuted\x18\x01 \x03(\t\x12\x0f\n\x07node_id\x18\x02 \x01(\t\x12\x11\n\tnode_type\x18\x03 \x01(\t\x1a#\n\x0f\x45xecutionCached\x12\x10\n\x08node_ids\x18\x01 \x03(\t\x1aH\n\x06Output\x12\x0f\n\x07node_id\x18\x01 \x01(\t\x12-\n\x05\x66iles\x18\x02 \x03(\x0b\x32\x1e.comfy_request.v1.WorkflowFile\x1a\x44\n\rCustomMessage\x12\x0c\n\x04type\x18\x01 \x01(\t\x12%\n\x04\x64\x61ta\x18\x02 \x01(\x0b\x32\x17.google.protobuf.StructB\x0e\n\x0cmessage_type\"\x9f\x01\n\rMessageFilter\x12\x14\n\x0coutputs_only\x18\x01 \x01(\x08\x12\x1f\n\x12include_temp_files\x18\x02 \x01(\x08H\x00\x88\x01\x01\x12$\n\x17include_latent_previews\x18\x03 \x01(\x08H\x01\x88\x01\x01\x42\x15\n\x13_include_temp_filesB\x1a\n\x18_include_latent_previews\"k\n\x14StreamSessionRequest\x12\x12\n\nsession_id\x18\x01 \x01(\t\x12\x34\n\x06\x66ilter\x18\x02 \x01(\x0b\x32\x1f.comfy_request.v1.MessageFilterH\x00\x88\x01\x01\x42\t\n\x07_filter\"c\n\x10StreamJobRequest\x12\x0e\n\x06job_id\x18\x01 \x01(\t\x12\x34\n\x06\x66ilter\x18\x02 \x01(\x0b\x32\x1f.comfy_request.v1.MessageFilterH\x00\x88\x01\x01\x42\t\n\x07_filter\"\x1f\n\tSessionId\x12\x12\n\nsession_id\x18\x01 \x01(\t\"\x17\n\x05JobId\x12\x0e\n\x06job_id\x18\x01 \x01(\t\"\xde\x02\n\x0eNodeDefinition\x12\x14\n\x0c\x64isplay_name\x18\x01 \x01(\t\x12\x13\n\x0b\x64\x65scription\x18\x02 \x01(\t\x12\x10\n\x08\x63\x61tegory\x18\x03 \x01(\t\x12\x39\n\x06inputs\x18\x04 \x03(\x0b\x32).comfy_request.v1.NodeDefinition.InputDef\x12;\n\x07outputs\x18\x05 \x03(\x0b\x32*.comfy_request.v1.NodeDefinition.OutputDef\x12\x13\n\x0boutput_node\x18\x06 \x01(\x08\x1aS\n\x08InputDef\x12\r\n\x05label\x18\x01 \x01(\t\x12\x11\n\tedge_type\x18\x02 \x01(\t\x12%\n\x04spec\x18\x03 \x01(\x0b\x32\x17.google.protobuf.Struct\x1a-\n\tOutputDef\x12\r\n\x05label\x18\x01 \x01(\t\x12\x11\n\tedge_type\x18\x02 \x01(\t\"\x8d\x01\n\x08NodeDefs\x12\x32\n\x04\x64\x65\x66s\x18\x01 \x03(\x0b\x32$.comfy_request.v1.NodeDefs.DefsEntry\x1aM\n\tDefsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12/\n\x05value\x18\x02 \x01(\x0b\x32 .comfy_request.v1.NodeDefinition:\x02\x38\x01\"\'\n\x0eNodeDefRequest\x12\x15\n\rextension_ids\x18\x01 \x03(\t\"r\n\x06Models\x12\x30\n\x04info\x18\x01 \x03(\x0b\x32\".comfy_request.v1.Models.ModelInfo\x1a\x36\n\tModelInfo\x12\x13\n\x0b\x62lake3_hash\x18\x01 \x01(\t\x12\x14\n\x0c\x64isplay_name\x18\x02 \x01(\t\"\x93\x01\n\x0cModelCatalog\x12:\n\x06models\x18\x01 \x03(\x0b\x32*.comfy_request.v1.ModelCatalog.ModelsEntry\x1aG\n\x0bModelsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\'\n\x05value\x18\x02 \x01(\x0b\x32\x18.comfy_request.v1.Models:\x02\x38\x01\"+\n\x13ModelCatalogRequest\x12\x14\n\x0c\x61rchitecture\x18\x01 \x03(\t2\xbc\x06\n\x05\x43omfy\x12M\n\x0bRunWorkflow\x12\x1e.comfy_request.v1.ComfyRequest\x1a\x1c.comfy_request.v1.JobCreated\"\x00\x12P\n\x0fRunWorkflowSync\x12\x1e.comfy_request.v1.ComfyRequest\x1a\x1b.comfy_request.v1.JobOutput\"\x00\x12[\n\rStreamSession\x12&.comfy_request.v1.StreamSessionRequest\x1a\x1e.comfy_request.v1.ComfyMessage\"\x00\x30\x01\x12S\n\tStreamJob\x12\".comfy_request.v1.StreamJobRequest\x1a\x1e.comfy_request.v1.ComfyMessage\"\x00\x30\x01\x12>\n\tCancelJob\x12\x17.comfy_request.v1.JobId\x1a\x16.google.protobuf.Empty\"\x00\x12J\n\x11PurgeSessionQueue\x12\x1b.comfy_request.v1.SessionId\x1a\x16.google.protobuf.Empty\"\x00\x12T\n\x11GetSessionHistory\x12\x1b.comfy_request.v1.SessionId\x1a .comfy_request.v1.SessionHistory\"\x00\x12L\n\x13\x43learSessionHistory\x12\x1b.comfy_request.v1.SessionId\x1a\x16.google.protobuf.Empty\"\x00\x12T\n\x12GetNodeDefinitions\x12 .comfy_request.v1.NodeDefRequest\x1a\x1a.comfy_request.v1.NodeDefs\"\x00\x12Z\n\x0fGetModelCatalog\x12%.comfy_request.v1.ModelCatalogRequest\x1a\x1e.comfy_request.v1.ModelCatalog\"\x00\x62\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x16\x63omfy_request.v1.proto\x12\x10\x63omfy_request.v1\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\x19serialized_graph.v1.proto\"K\n\x0cWorkflowStep\x12\x12\n\nclass_type\x18\x01 \x01(\t\x12\'\n\x06inputs\x18\x02 \x01(\x0b\x32\x17.google.protobuf.Struct\"-\n\rFileReference\x12\x0b\n\x03url\x18\x01 \x01(\t\x12\x0f\n\x07is_temp\x18\x02 \x01(\x08\"\x85\x01\n\x0cWorkflowFile\x12\x13\n\x0b\x62lake3_hash\x18\x01 \x01(\t\x12\x11\n\tmime_type\x18\x02 \x01(\t\x12\x34\n\treference\x18\x03 \x01(\x0b\x32\x1f.comfy_request.v1.FileReferenceH\x00\x12\x0f\n\x05\x62ytes\x18\x04 \x01(\x0cH\x00\x42\x06\n\x04\x64\x61ta\"H\n\tLocalFile\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x0c\n\x04path\x18\x02 \x01(\t\x12\x0c\n\x04size\x18\x03 \x01(\x03\x12\x11\n\tmime_type\x18\x04 \x01(\t\"\x94\x01\n\nLocalFiles\x12*\n\x05\x61\x64\x64\x65\x64\x18\x01 \x03(\x0b\x32\x1b.comfy_request.v1.LocalFile\x12,\n\x07updated\x18\x02 \x03(\x0b\x32\x1b.comfy_request.v1.LocalFile\x12,\n\x07removed\x18\x03 \x03(\x0b\x32\x1b.comfy_request.v1.LocalFile\"\x17\n\x05JobId\x12\x0e\n\x06job_id\x18\x01 \x01(\t\"n\n\x0cOutputConfig\x12\x1e\n\x11write_to_graph_id\x18\x01 \x01(\tH\x00\x88\x01\x01\x12\x18\n\x0bwebhook_url\x18\x02 \x01(\tH\x01\x88\x01\x01\x42\x14\n\x12_write_to_graph_idB\x0e\n\x0c_webhook_url\"\xec\x02\n\x0c\x43omfyRequest\x12\x17\n\nrequest_id\x18\x01 \x01(\tH\x00\x88\x01\x01\x12>\n\x08workflow\x18\x02 \x03(\x0b\x32,.comfy_request.v1.ComfyRequest.WorkflowEntry\x12@\n\x10serialized_graph\x18\x03 \x01(\x0b\x32!.serialized_graph.SerializedGraphH\x01\x88\x01\x01\x12:\n\routput_config\x18\x04 \x01(\x0b\x32\x1e.comfy_request.v1.OutputConfigH\x02\x88\x01\x01\x1aO\n\rWorkflowEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12-\n\x05value\x18\x02 \x01(\x0b\x32\x1e.comfy_request.v1.WorkflowStep:\x02\x38\x01\x42\r\n\x0b_request_idB\x13\n\x11_serialized_graphB\x10\n\x0e_output_config\"\xa6\x02\n\x0bJobSnapshot\x12\x0e\n\x06job_id\x18\x01 \x01(\t\x12\x17\n\nrequest_id\x18\x02 \x01(\tH\x00\x88\x01\x01\x12+\n\x06status\x18\x03 \x01(\x0e\x32\x1b.comfy_request.v1.JobStatus\x12,\n\x07outputs\x18\x04 \x03(\x0b\x32\x1b.comfy_request.v1.JobOutput\x12;\n\x07metrics\x18\x05 \x01(\x0b\x32%.comfy_request.v1.JobSnapshot.MetricsH\x01\x88\x01\x01\x1a;\n\x07Metrics\x12\x15\n\rqueue_seconds\x18\x01 \x01(\r\x12\x19\n\x11\x65xecution_seconds\x18\x02 \x01(\rB\r\n\x0b_request_idB\n\n\x08_metrics\"^\n\tJobOutput\x12\x0f\n\x07node_id\x18\x01 \x01(\t\x12\x12\n\nclass_type\x18\x02 \x01(\t\x12,\n\x04\x66ile\x18\x03 \x01(\x0b\x32\x1e.comfy_request.v1.WorkflowFile\"\'\n\x0eNodeDefRequest\x12\x15\n\rextension_ids\x18\x01 \x03(\t\"\xde\x02\n\x0eNodeDefinition\x12\x14\n\x0c\x64isplay_name\x18\x01 \x01(\t\x12\x13\n\x0b\x64\x65scription\x18\x02 \x01(\t\x12\x10\n\x08\x63\x61tegory\x18\x03 \x01(\t\x12\x39\n\x06inputs\x18\x04 \x03(\x0b\x32).comfy_request.v1.NodeDefinition.InputDef\x12;\n\x07outputs\x18\x05 \x03(\x0b\x32*.comfy_request.v1.NodeDefinition.OutputDef\x12\x13\n\x0boutput_node\x18\x06 \x01(\x08\x1aS\n\x08InputDef\x12\r\n\x05label\x18\x01 \x01(\t\x12\x11\n\tedge_type\x18\x02 \x01(\t\x12%\n\x04spec\x18\x03 \x01(\x0b\x32\x17.google.protobuf.Struct\x1a-\n\tOutputDef\x12\r\n\x05label\x18\x01 \x01(\t\x12\x11\n\tedge_type\x18\x02 \x01(\t\"\x8d\x01\n\x08NodeDefs\x12\x32\n\x04\x64\x65\x66s\x18\x01 \x03(\x0b\x32$.comfy_request.v1.NodeDefs.DefsEntry\x1aM\n\tDefsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12/\n\x05value\x18\x02 \x01(\x0b\x32 .comfy_request.v1.NodeDefinition:\x02\x38\x01\"h\n\x06Models\x12+\n\x04info\x18\x01 \x03(\x0b\x32\x1d.comfy_request.v1.Models.Info\x1a\x31\n\x04Info\x12\x13\n\x0b\x62lake3_hash\x18\x01 \x01(\t\x12\x14\n\x0c\x64isplay_name\x18\x02 \x01(\t\"\x93\x01\n\x0cModelCatalog\x12:\n\x06models\x18\x01 \x03(\x0b\x32*.comfy_request.v1.ModelCatalog.ModelsEntry\x1aG\n\x0bModelsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\'\n\x05value\x18\x02 \x01(\x0b\x32\x18.comfy_request.v1.Models:\x02\x38\x01\"*\n\x13ModelCatalogRequest\x12\x13\n\x0b\x62\x61se_family\x18\x01 \x03(\t*M\n\tJobStatus\x12\n\n\x06QUEUED\x10\x00\x12\r\n\tEXECUTING\x10\x01\x12\r\n\tCOMPLETED\x10\x02\x12\t\n\x05\x45RROR\x10\x03\x12\x0b\n\x07\x41\x42ORTED\x10\x04\x32\xdd\x03\n\x05\x43omfy\x12\x46\n\x03Run\x12\x1e.comfy_request.v1.ComfyRequest\x1a\x1d.comfy_request.v1.JobSnapshot\"\x00\x12J\n\x07RunSync\x12\x1e.comfy_request.v1.ComfyRequest\x1a\x1b.comfy_request.v1.JobOutput\"\x00\x30\x01\x12\x42\n\x06GetJob\x12\x17.comfy_request.v1.JobId\x1a\x1d.comfy_request.v1.JobSnapshot\"\x00\x12T\n\x12GetNodeDefinitions\x12 .comfy_request.v1.NodeDefRequest\x1a\x1a.comfy_request.v1.NodeDefs\"\x00\x12Z\n\x0fGetModelCatalog\x12%.comfy_request.v1.ModelCatalogRequest\x1a\x1e.comfy_request.v1.ModelCatalog\"\x00\x12J\n\x0eSyncLocalFiles\x12\x16.google.protobuf.Empty\x1a\x1c.comfy_request.v1.LocalFiles\"\x00\x30\x01\x62\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -30,76 +30,54 @@ if _descriptor._USE_C_DESCRIPTORS == False:
   _globals['_NODEDEFS_DEFSENTRY']._serialized_options = b'8\001'
   _globals['_MODELCATALOG_MODELSENTRY']._options = None
   _globals['_MODELCATALOG_MODELSENTRY']._serialized_options = b'8\001'
-  _globals['_WORKFLOWSTEP']._serialized_start=112
-  _globals['_WORKFLOWSTEP']._serialized_end=187
-  _globals['_WORKFLOWFILE']._serialized_start=190
-  _globals['_WORKFLOWFILE']._serialized_end=385
-  _globals['_WORKFLOWFILE_FILEREFERENCE']._serialized_start=327
-  _globals['_WORKFLOWFILE_FILEREFERENCE']._serialized_end=372
-  _globals['_OUTPUTCONFIG']._serialized_start=387
-  _globals['_OUTPUTCONFIG']._serialized_end=453
-  _globals['_COMFYREQUEST']._serialized_start=456
-  _globals['_COMFYREQUEST']._serialized_end=910
-  _globals['_COMFYREQUEST_WORKFLOWENTRY']._serialized_start=770
-  _globals['_COMFYREQUEST_WORKFLOWENTRY']._serialized_end=849
-  _globals['_JOBCREATED']._serialized_start=912
-  _globals['_JOBCREATED']._serialized_end=1010
-  _globals['_JOBOUTPUT']._serialized_start=1012
-  _globals['_JOBOUTPUT']._serialized_end=1106
-  _globals['_SESSIONHISTORY']._serialized_start=1108
-  _globals['_SESSIONHISTORY']._serialized_end=1170
-  _globals['_COMFYMESSAGE']._serialized_start=1173
-  _globals['_COMFYMESSAGE']._serialized_end=2520
-  _globals['_COMFYMESSAGE_QUEUESTATUS']._serialized_start=1853
-  _globals['_COMFYMESSAGE_QUEUESTATUS']._serialized_end=1917
-  _globals['_COMFYMESSAGE_EXECUTIONSTART']._serialized_start=1919
-  _globals['_COMFYMESSAGE_EXECUTIONSTART']._serialized_end=1935
-  _globals['_COMFYMESSAGE_EXECUTING']._serialized_start=1937
-  _globals['_COMFYMESSAGE_EXECUTING']._serialized_end=1965
-  _globals['_COMFYMESSAGE_PROGRESS']._serialized_start=1967
-  _globals['_COMFYMESSAGE_PROGRESS']._serialized_end=2005
-  _globals['_COMFYMESSAGE_EXECUTIONERROR']._serialized_start=2008
-  _globals['_COMFYMESSAGE_EXECUTIONERROR']._serialized_end=2245
-  _globals['_COMFYMESSAGE_EXECUTIONINTERRUPTED']._serialized_start=2247
-  _globals['_COMFYMESSAGE_EXECUTIONINTERRUPTED']._serialized_end=2323
-  _globals['_COMFYMESSAGE_EXECUTIONCACHED']._serialized_start=2325
-  _globals['_COMFYMESSAGE_EXECUTIONCACHED']._serialized_end=2360
-  _globals['_COMFYMESSAGE_OUTPUT']._serialized_start=2362
-  _globals['_COMFYMESSAGE_OUTPUT']._serialized_end=2434
-  _globals['_COMFYMESSAGE_CUSTOMMESSAGE']._serialized_start=2436
-  _globals['_COMFYMESSAGE_CUSTOMMESSAGE']._serialized_end=2504
-  _globals['_MESSAGEFILTER']._serialized_start=2523
-  _globals['_MESSAGEFILTER']._serialized_end=2682
-  _globals['_STREAMSESSIONREQUEST']._serialized_start=2684
-  _globals['_STREAMSESSIONREQUEST']._serialized_end=2791
-  _globals['_STREAMJOBREQUEST']._serialized_start=2793
-  _globals['_STREAMJOBREQUEST']._serialized_end=2892
-  _globals['_SESSIONID']._serialized_start=2894
-  _globals['_SESSIONID']._serialized_end=2925
-  _globals['_JOBID']._serialized_start=2927
-  _globals['_JOBID']._serialized_end=2950
-  _globals['_NODEDEFINITION']._serialized_start=2953
-  _globals['_NODEDEFINITION']._serialized_end=3303
-  _globals['_NODEDEFINITION_INPUTDEF']._serialized_start=3173
-  _globals['_NODEDEFINITION_INPUTDEF']._serialized_end=3256
-  _globals['_NODEDEFINITION_OUTPUTDEF']._serialized_start=3258
-  _globals['_NODEDEFINITION_OUTPUTDEF']._serialized_end=3303
-  _globals['_NODEDEFS']._serialized_start=3306
-  _globals['_NODEDEFS']._serialized_end=3447
-  _globals['_NODEDEFS_DEFSENTRY']._serialized_start=3370
-  _globals['_NODEDEFS_DEFSENTRY']._serialized_end=3447
-  _globals['_NODEDEFREQUEST']._serialized_start=3449
-  _globals['_NODEDEFREQUEST']._serialized_end=3488
-  _globals['_MODELS']._serialized_start=3490
-  _globals['_MODELS']._serialized_end=3604
-  _globals['_MODELS_MODELINFO']._serialized_start=3550
-  _globals['_MODELS_MODELINFO']._serialized_end=3604
-  _globals['_MODELCATALOG']._serialized_start=3607
-  _globals['_MODELCATALOG']._serialized_end=3754
-  _globals['_MODELCATALOG_MODELSENTRY']._serialized_start=3683
-  _globals['_MODELCATALOG_MODELSENTRY']._serialized_end=3754
-  _globals['_MODELCATALOGREQUEST']._serialized_start=3756
-  _globals['_MODELCATALOGREQUEST']._serialized_end=3799
-  _globals['_COMFY']._serialized_start=3802
-  _globals['_COMFY']._serialized_end=4630
+  _globals['_JOBSTATUS']._serialized_start=2350
+  _globals['_JOBSTATUS']._serialized_end=2427
+  _globals['_WORKFLOWSTEP']._serialized_start=130
+  _globals['_WORKFLOWSTEP']._serialized_end=205
+  _globals['_FILEREFERENCE']._serialized_start=207
+  _globals['_FILEREFERENCE']._serialized_end=252
+  _globals['_WORKFLOWFILE']._serialized_start=255
+  _globals['_WORKFLOWFILE']._serialized_end=388
+  _globals['_LOCALFILE']._serialized_start=390
+  _globals['_LOCALFILE']._serialized_end=462
+  _globals['_LOCALFILES']._serialized_start=465
+  _globals['_LOCALFILES']._serialized_end=613
+  _globals['_JOBID']._serialized_start=615
+  _globals['_JOBID']._serialized_end=638
+  _globals['_OUTPUTCONFIG']._serialized_start=640
+  _globals['_OUTPUTCONFIG']._serialized_end=750
+  _globals['_COMFYREQUEST']._serialized_start=753
+  _globals['_COMFYREQUEST']._serialized_end=1117
+  _globals['_COMFYREQUEST_WORKFLOWENTRY']._serialized_start=984
+  _globals['_COMFYREQUEST_WORKFLOWENTRY']._serialized_end=1063
+  _globals['_JOBSNAPSHOT']._serialized_start=1120
+  _globals['_JOBSNAPSHOT']._serialized_end=1414
+  _globals['_JOBSNAPSHOT_METRICS']._serialized_start=1328
+  _globals['_JOBSNAPSHOT_METRICS']._serialized_end=1387
+  _globals['_JOBOUTPUT']._serialized_start=1416
+  _globals['_JOBOUTPUT']._serialized_end=1510
+  _globals['_NODEDEFREQUEST']._serialized_start=1512
+  _globals['_NODEDEFREQUEST']._serialized_end=1551
+  _globals['_NODEDEFINITION']._serialized_start=1554
+  _globals['_NODEDEFINITION']._serialized_end=1904
+  _globals['_NODEDEFINITION_INPUTDEF']._serialized_start=1774
+  _globals['_NODEDEFINITION_INPUTDEF']._serialized_end=1857
+  _globals['_NODEDEFINITION_OUTPUTDEF']._serialized_start=1859
+  _globals['_NODEDEFINITION_OUTPUTDEF']._serialized_end=1904
+  _globals['_NODEDEFS']._serialized_start=1907
+  _globals['_NODEDEFS']._serialized_end=2048
+  _globals['_NODEDEFS_DEFSENTRY']._serialized_start=1971
+  _globals['_NODEDEFS_DEFSENTRY']._serialized_end=2048
+  _globals['_MODELS']._serialized_start=2050
+  _globals['_MODELS']._serialized_end=2154
+  _globals['_MODELS_INFO']._serialized_start=2105
+  _globals['_MODELS_INFO']._serialized_end=2154
+  _globals['_MODELCATALOG']._serialized_start=2157
+  _globals['_MODELCATALOG']._serialized_end=2304
+  _globals['_MODELCATALOG_MODELSENTRY']._serialized_start=2233
+  _globals['_MODELCATALOG_MODELSENTRY']._serialized_end=2304
+  _globals['_MODELCATALOGREQUEST']._serialized_start=2306
+  _globals['_MODELCATALOGREQUEST']._serialized_end=2348
+  _globals['_COMFY']._serialized_start=2430
+  _globals['_COMFY']._serialized_end=2907
 # @@protoc_insertion_point(module_scope)

@@ -38,7 +38,7 @@ create_sym_links() {
         if [[ -n "$src" && -n "$dest" ]]; then
             create_link "$src" "$dest"
         fi
-    done < "/comfy-ts/symlinks.txt"
+    done < "/inference-api/symlinks.txt"
 }
 
 create_link() {
@@ -89,10 +89,10 @@ run_comfy() {
     echo "Running ComfyUI..."
     export PYTHONUNBUFFERED=1
     source /venv/bin/activate
-    # rsync -au --remove-source-files /ComfyUI/ /comfy-ts/ComfyUI/
-    # ln -s /comfy-models/* /comfy-ts/ComfyUI/models/checkpoints/
+    # rsync -au --remove-source-files /ComfyUI/ /inference-api/ComfyUI/
+    # ln -s /comfy-models/* /inference-api/ComfyUI/models/checkpoints/
 
-    cd /comfy-ts/
+    cd /inference-api/
 
     # Check if CUDA is available
     if python -c "import torch; print(torch.cuda.is_available())" | grep True; then
@@ -118,10 +118,10 @@ if [ -d "/runpod-volume/models/" ] && [[ "1" -ne $NO_MODEL_CACHE ]] ; then
     mkdir /usr/share/memory
     cp -r /runpod-volume/models /usr/share/memory
     echo "Copying config for local model cache"
-    cp /comfy-ts/model_paths/extra_model_paths_cache.yaml /comfy-ts/extra_model_paths.yaml &
+    cp /inference-api/model_paths/extra_model_paths_cache.yaml /inference-api/extra_model_paths.yaml &
 else
     echo "Copying config for loading models from NFS"
-    cp /comfy-ts/model_paths/extra_model_paths_nfs.yaml /comfy-ts/extra_model_paths.yaml
+    cp /inference-api/model_paths/extra_model_paths_nfs.yaml /inference-api/extra_model_paths.yaml
 fi
 }
 

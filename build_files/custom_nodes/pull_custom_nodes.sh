@@ -1,5 +1,5 @@
 #!/bin/bash
-CUSTOM_NODE_DIR="/comfy-ts/custom_nodes"
+CUSTOM_NODE_DIR="/inference-api/custom_nodes"
 VENV_DIR="/venv"
 . "$VENV_DIR"/bin/activate
 

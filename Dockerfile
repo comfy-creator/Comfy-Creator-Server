@@ -1,15 +1,4 @@
-# Stage 1: Build stage
-FROM node:18 as builder
-
-WORKDIR /web-src
-
-COPY /web-src/ .
-COPY package.json yarn.lock ./
-
-RUN yarn install
-RUN yarn build || true
-
-# Stage 2: Production stage
+# Stage 1: Production stage
 FROM nvidia/cuda:12.1.1-runtime-ubuntu22.04 as runtime
 
 # Configure shell
@@ -18,7 +7,7 @@ ENV SHELL=/bin/bash
 ENV PYTHONUNBUFFERED=1
 
 # Set the working directory in the docker container
-WORKDIR /comfy-ts
+WORKDIR /inference-api
 
 # Configure apt-get to automatically use noninteractive settings
 ENV DEBIAN_FRONTEND=noninteractive
@@ -56,23 +45,23 @@ RUN pip install --upgrade --no-cache-dir pip && \
     pip install --upgrade wheel && \
     pip install --upgrade --no-cache-dir torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
 
-COPY requirements.txt requirements-ts.txt ./
+COPY requirements.txt requirements-new.txt ./
 RUN pip install --no-cache-dir -r requirements.txt \
-    && pip install --no-cache-dir -r requirements-ts.txt 
+    && pip install --no-cache-dir -r requirements-new.txt 
 
 # Set up Jupyter Notebook
 RUN jupyter contrib nbextension install --user && \
     jupyter nbextension enable --py widgetsnbextension
 
 # Folders / files in .dockerignore will not be included
-# Copy the necessary parts of ComfyTS. 
+# Copy the necessary parts of Comfy Inference API. 
 COPY . .
-COPY ./app ./app
-COPY ./build_files ./build_files
-COPY ./comfy ./comfy
-COPY ./comfy_extras ./comfy_extras
-COPY ./notebooks ./notebooks
-COPY ./script_examples ./script_examples
+# COPY ./app ./app
+# COPY ./build_files ./build_files
+# COPY ./comfy ./comfy
+# COPY ./comfy_extras ./comfy_extras
+# COPY ./notebooks ./notebooks
+# COPY ./script_examples ./script_examples
 
 # Copy over our UI build files
 # COPY --from=builder ./web ./web
@@ -82,7 +71,7 @@ RUN mv ./build_files/nginx.conf /etc/nginx/nginx.conf
 RUN mv ./build_files/readme.html /usr/share/nginx/html/readme.html
 
 # Use dos2unix to ensure line-endings are unix-style
-# TO DO: if we build these directories into ComfyTS, we can remove this step
+# TO DO: if we build these directories into Comfy Inference API, we can remove this step
 RUN mv ./build_files/model_paths/symlinks.txt .
 RUN dos2unix ./symlinks.txt
 
@@ -90,9 +79,9 @@ RUN dos2unix ./symlinks.txt
 COPY catfs /usr/local/bin
 
 # Installing rsfw-cache
-WORKDIR /opt
+# WORKDIR /opt
 #RUN git clone https://github.com/m-arbaro/rsfw-cache
-WORKDIR /comfy-ts
+# WORKDIR /inference-api
 # Creating mountpoint for tmpfs:
 # RUN mkdir /usr/share/memory
 
@@ -119,5 +108,5 @@ RUN dos2unix ./start.sh && \
 # RUN useradd -l -M appuser
 # USER appuser
 
-# Run ComfyTS, Jupyter Notebook, and NGINX Proxy
-CMD ["/comfy-ts/start.sh"]
+# Run the Comfy Inference Server, Jupyter Notebook, and NGINX Proxy
+CMD ["/inference-api/start.sh"]

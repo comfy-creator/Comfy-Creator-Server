@@ -14,7 +14,7 @@ Project goals:
 You need the following installed locally: 
 
 - Python 3.10+
-- (maybe a js-package manager, like yarn, npm, or pnpm))
+- (maybe a js-package manager, like yarn, npm, or pnpm)
 
 ### How to Run
 
@@ -37,11 +37,11 @@ If you'd prefer to use Docker instead, you can.
 
 - Start your docker daemon (install Docker if you don't already have it), then in the root folder run the build command:
 
-  `docker build -t comfycreator/inference-api:0.2.0 .`
+  `docker build -t comfycreator/inference-api:0.3.0 .`
 
 - If you'd prefer to use our prebuilt docker-image instead, pull it from our docker hub:
 
-  `docker pull comfycreator/inference-api:0.2.0`
+  `docker pull comfycreator/inference-api:0.3.0`
 
 Note that the docker-build does not copy any of the models into the docker-image, which would bloat the image-size. Instead, it expects to load the models from an external filesystem upon startup; in this case, on your local computer. To run the container, use the command:
 
@@ -60,7 +60,7 @@ Check these out as alternative ComfyUI docker containers, if you'd rather run th
 
 - Make sure filesystem cache and sym-links are working.
 - Do we really need the extra_model_paths?
-- We probably won't need sym-links and extra-model paths anymore to be honest; we can build those into comfy-ts directly.
+- We probably won't need sym-links and extra-model paths anymore to be honest; we can build those into comfy-inference-api directly.
 - Stop custom nodes from downloading external files and doing pip-install at runtime (on startup). We should ensure that's all done at build-time.
 - NFS sym-links: all of ComfyUI's folders (/input, /output, /temp, /models) should be symlinked to an NFS drive, so that they can be shared amongst workers.
 

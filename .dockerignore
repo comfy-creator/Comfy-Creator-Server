@@ -14,6 +14,8 @@ node_modules/
 /input
 /models
 /output
+/script_examples
 /temp
 /tests
 /tests-ui
+/user

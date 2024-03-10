@@ -545,15 +545,16 @@ class PromptServer():
             self.app.add_routes([
                 web.static('/extensions/' + urllib.parse.quote(name), dir),
             ])
-            
-        serve_react_app(self.app, self.web_root, f"http://localhost:{args.port}", 'ws')
+        
+        # TO DO: bring back later
+        # serve_react_app(self.app, self.web_root, f"http://localhost:{args.port}", 'ws')
         # self.app.add_routes([
         #     web.static('/', self.web_root, follow_symlinks=True),
         # ])
 
-        self.app.add_routes([
-            web.static('/', self.web_root),
-        ])
+        # self.app.add_routes([
+        #     web.static('/', self.web_root),
+        # ])
 
     def get_queue_info(self):
         prompt_info = {}

@@ -6,7 +6,7 @@ from torch import nn
 import torchsde
 from tqdm.auto import trange, tqdm
 
-from . import utils
+from comfy.k_diffusion import utils
 
 
 def append_zero(x):

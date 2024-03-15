@@ -13,3 +13,4 @@ https://github.com/pythongosssss/ComfyUI-WD14-Tagger main ae1102a
 https://github.com/SOELexicon/ComfyUI-LexTools main a559d38
 https://github.com/storyicon/comfyui_segment_anything master 681d977
 https://github.com/Ttl/ComfyUi_NNLatentUpscale master 08105da
+https://github.com/ltdrdata/ComfyUI-Manager main bb440a4

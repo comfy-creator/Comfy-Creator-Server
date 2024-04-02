@@ -16,6 +16,7 @@ from PIL.PngImagePlugin import PngInfo
 from io import BytesIO
 
 import aiohttp
+import aiohttp_cors
 from aiohttp import web
 import logging
 
@@ -82,6 +83,13 @@ class PromptServer():
 
         max_upload_size = round(args.max_upload_size * 1024 * 1024)
         self.app = web.Application(client_max_size=max_upload_size, middlewares=middlewares)
+        self.cors = aiohttp_cors.setup(self.app, defaults={
+            "*": aiohttp_cors.ResourceOptions(
+                allow_credentials=True,
+                expose_headers="*",
+                allow_headers="*",
+            )
+        })
         self.sockets = dict()
         self.web_root = os.path.join(os.path.dirname(
             os.path.realpath(__file__)), "web/dist")
@@ -529,7 +537,11 @@ class PromptServer():
                     self.prompt_queue.delete_history_item(id_to_delete)
 
             return web.Response(status=200)
-        
+
+    def setup_cors(self):
+        for route in list(self.app.router.routes()):
+            self.cors.add(route)
+
     def add_routes(self):
         self.user_manager.add_routes(self.routes)
         self.app.add_routes(self.routes)
@@ -549,6 +561,10 @@ class PromptServer():
         # self.app.add_routes([
         #     web.static('/', self.web_root),
         # ])
+
+        # Setup CORS on all routs
+        self.setup_cors()
+
 
     def get_queue_info(self):
         prompt_info = {}

@@ -35,6 +35,8 @@ import importlib
 import folder_paths
 import latent_preview
 
+from typing import Dict, List, Optional, Tuple, Union, Any
+
 def before_node_execution():
     comfy.model_management.throw_exception_if_processing_interrupted()
 
@@ -45,42 +47,111 @@ MAX_RESOLUTION=8192
 
 class CLIPTextEncode:
     @classmethod
-    def INPUT_TYPES(s):
+    def INPUT_TYPES(s) -> Dict[str, Dict[str, Union[Tuple[str], Tuple[str, Dict]]]]:
+        """
+        Defines the expected input types for the layer.
+
+        Returns:
+            A dictionary specifying the required inputs and their properties.
+        """
         return {"required": {"text": ("STRING", {"multiline": True}), "clip": ("CLIP", )}}
+    
     RETURN_TYPES = ("CONDITIONING",)
     FUNCTION = "encode"
 
     CATEGORY = "conditioning"
 
-    def encode(self, clip, text):
+    def encode(self, clip: Any, text: str) -> Tuple[List[List[Union[torch.Tensor, Dict]]]]:
+        """
+        Encodes text using a CLIP model.
+
+        Args:
+            clip: A CLIP model object.
+            text: The text to be encoded. Can be multiline.
+
+        Returns:
+            A tuple containing a single-element list, where the element is another list representing the conditioning representation and its pooled output.
+        """
+
         tokens = clip.tokenize(text)
         cond, pooled = clip.encode_from_tokens(tokens, return_pooled=True)
         return ([[cond, {"pooled_output": pooled}]], )
 
 class ConditioningCombine:
+    """
+    This class combines two conditioning representations using element-wise addition.
+
+    It takes two conditioning representations as input and returns a new conditioning representation obtained by adding corresponding elements.
+    """
+
     @classmethod
-    def INPUT_TYPES(s):
+    def INPUT_TYPES(s) -> Dict[str, Dict[str, Tuple[str]]]:
+
         return {"required": {"conditioning_1": ("CONDITIONING", ), "conditioning_2": ("CONDITIONING", )}}
+    
     RETURN_TYPES = ("CONDITIONING",)
     FUNCTION = "combine"
 
     CATEGORY = "conditioning"
 
-    def combine(self, conditioning_1, conditioning_2):
+    def combine(self, conditioning_1: List[Union[torch.Tensor, Dict]], 
+                conditioning_2: List[Union[torch.Tensor, Dict]]) -> Tuple[List[Union[torch.Tensor, Dict]]]:
+        """
+        Combines two conditioning representations using element-wise addition.
+
+        Args:
+            conditioning_1: The first conditioning representation.
+            conditioning_2: The second conditioning representation.
+
+        Returns:
+            A tuple containing the combined conditioning representation.
+        """
+
         return (conditioning_1 + conditioning_2, )
 
-class ConditioningAverage :
+
+class ConditioningAverage:
+    """
+    This class implements a layer that performs a weighted average between a conditioning input and a target input.
+
+    The weights are determined by a `conditioning_to_strength` parameter, which ranges from 0.0 (all target) to 1.0 (all conditioning).
+    """
+
     @classmethod
-    def INPUT_TYPES(s):
-        return {"required": {"conditioning_to": ("CONDITIONING", ), "conditioning_from": ("CONDITIONING", ),
-                              "conditioning_to_strength": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01})
-                             }}
+    def INPUT_TYPES(s) -> Dict[str, Dict[str, Union[Tuple[str], Tuple[str, dict[str, float]]]]]:
+        """
+        Defines the expected input types for the layer.
+
+        Returns:
+            A dictionary specifying the required inputs and their properties.
+        """
+        return {
+            "required": {
+                "conditioning_to": ("CONDITIONING",),
+                "conditioning_from": ("CONDITIONING",),
+                "conditioning_to_strength": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01}),
+            }
+        }
+
     RETURN_TYPES = ("CONDITIONING",)
     FUNCTION = "addWeighted"
-
     CATEGORY = "conditioning"
 
-    def addWeighted(self, conditioning_to, conditioning_from, conditioning_to_strength):
+    def addWeighted(self, conditioning_to: List[Tuple[torch.Tensor, Dict]], conditioning_from: List[Tuple[torch.Tensor, Dict]],
+                    conditioning_to_strength: float = 1.0) -> Tuple[List[List[object]]]:
+        
+        """
+        Performs a weighted average between conditioning and target inputs.
+
+        Args:
+            conditioning_to: A list of tuples containing the target tensor and its metadata.
+            conditioning_from: A list of tuples containing the conditioning tensor and its metadata.
+            conditioning_to_strength: A float between 0.0 and 1.0 controlling the weight of the conditioning input.
+
+        Returns:
+            A tuple containing a list of lists, where each inner list represents the weighted average and metadata for a target element.
+        """
+
         out = []
 
         if len(conditioning_from) > 1:
@@ -109,7 +180,7 @@ class ConditioningAverage :
 
 class ConditioningConcat:
     @classmethod
-    def INPUT_TYPES(s):
+    def INPUT_TYPES(s) -> Dict[str, Dict[str, Tuple[str]]]:
         return {"required": {
             "conditioning_to": ("CONDITIONING",),
             "conditioning_from": ("CONDITIONING",),
@@ -120,6 +191,7 @@ class ConditioningConcat:
     CATEGORY = "conditioning"
 
     def concat(self, conditioning_to, conditioning_from):
+        
         out = []
 
         if len(conditioning_from) > 1:
@@ -136,8 +208,17 @@ class ConditioningConcat:
         return (out, )
 
 class ConditioningSetArea:
+    """
+    This class sets a specific area within a conditioning representation with a given strength.
+
+    It takes a conditioning representation, width, height, x-coordinate, y-coordinate, and strength as input.
+    The method modifies the conditioning representation by adding an entry representing the specified area with the provided strength.
+
+    The area is defined by a normalized bounding box `(height // 8, width // 8, y // 8, x // 8)`, where each value ranges from 0.0 to 1.0 representing the fraction of the conditioning representation covered.
+    """
+
     @classmethod
-    def INPUT_TYPES(s):
+    def INPUT_TYPES(s) -> Dict[str, Dict[str, Union[Tuple[str], Tuple[str, dict[str, float | int]]]]]:
         return {"required": {"conditioning": ("CONDITIONING", ),
                               "width": ("INT", {"default": 64, "min": 64, "max": MAX_RESOLUTION, "step": 8}),
                               "height": ("INT", {"default": 64, "min": 64, "max": MAX_RESOLUTION, "step": 8}),
@@ -150,14 +231,33 @@ class ConditioningSetArea:
 
     CATEGORY = "conditioning"
 
-    def append(self, conditioning, width, height, x, y, strength):
+    def append(self, conditioning: List[Tuple[torch.Tensor, Dict]],
+               width: int, height: int, x: int, y: int, strength: float) -> Tuple[List[List[object]]]:
+        """
+        Sets a specific area within a conditioning representation with a given strength.
+
+        Args:
+            conditioning: A list of tuples containing the conditioning tensor and its metadata.
+            width: The width of the area (in pixels).
+            height: The height of the area (in pixels).
+            x: The x-coordinate of the top-left corner of the area (in pixels).
+            y: The y-coordinate of the top-left corner of the area (in pixels).
+            strength: The strength of the area, controlling its influence.
+
+        Returns:
+            A tuple containing a single-element list, where the element is another list representing the modified conditioning representation.
+        """
+
         c = []
         for t in conditioning:
-            n = [t[0], t[1].copy()]
-            n[1]['area'] = (height // 8, width // 8, y // 8, x // 8)
-            n[1]['strength'] = strength
-            n[1]['set_area_to_bounds'] = False
-            c.append(n)
+            t_list = list(t)
+            if isinstance(t_list[1], dict):
+                n = [t_list[0], t_list[1].copy()]
+                if isinstance(n[1], dict):
+                    n[1]['area'] = (height // 8, width // 8, y // 8, x // 8)
+                    n[1]['strength'] = strength
+                    n[1]['set_area_to_bounds'] = False
+                    c.append(n)
         return (c, )
 
 class ConditioningSetAreaPercentage:

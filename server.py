@@ -3,6 +3,8 @@ import sys
 import asyncio
 import traceback
 
+import aiohttp.abc
+
 import nodes
 import folder_paths
 import execution
@@ -28,27 +30,68 @@ from custom_types import QueueJobRequest, WorkflowStep, SerializedGraph
 
 from app.user_manager import UserManager
 from static_file_server import serve_react_app
+from typing import List, Dict, IO, Callable, Awaitable, Any
 
 class BinaryEventTypes:
     PREVIEW_IMAGE = 1
     UNENCODED_PREVIEW_IMAGE = 2
 
-async def send_socket_catch_exception(function, message):
+async def send_socket_catch_exception(function: Callable, message: dict) -> None:
+    """
+    Sends a message via the provided function and catches potential exceptions.
+
+    Args:
+        function: The function to call for sending the message.
+        message: The message dictionary to send.
+    """
+
     try:
         await function(message)
     except (aiohttp.ClientError, aiohttp.ClientPayloadError, ConnectionResetError) as err:
         logging.warning("send error: {}".format(err))
 
 @web.middleware
-async def cache_control(request: web.Request, handler):
+async def cache_control(request: web.Request, handler: Callable[[web.Request], Awaitable[web.Response]]) -> web.Response:
+    """
+    Middleware that sets cache control headers for specific file extensions.
+
+    Args:
+        request: The incoming web request.
+        handler: The next handler in the chain.
+
+    Returns:
+        The web response with cache control headers set if applicable.
+    """
+
     response: web.Response = await handler(request)
     if request.path.endswith('.js') or request.path.endswith('.css'):
         response.headers.setdefault('Cache-Control', 'no-cache')
     return response
 
 def create_cors_middleware(allowed_origin: str):
+    """
+    Creates a middleware function that adds CORS headers for the specified origin.
+
+    Args:
+        allowed_origin: The allowed origin for CORS requests.
+
+    Returns:
+        A middleware function that adds CORS headers.
+    """
+
     @web.middleware
-    async def cors_middleware(request: web.Request, handler):
+    async def cors_middleware(request: web.Request, handler: Callable[[web.Request], Awaitable[web.Response]]) -> web.Response:
+        """
+        Middleware function that adds CORS headers to the response.
+
+        Args:
+            request: The incoming web request.
+            handler: The next handler in the chain.
+
+        Returns:
+            The web response with CORS headers added.
+        """
+
         if request.method == "OPTIONS":
             # Pre-flight request. Reply successfully:
             response = web.Response()
@@ -64,7 +107,22 @@ def create_cors_middleware(allowed_origin: str):
     return cors_middleware
 
 class PromptServer():
-    def __init__(self, loop):
+    """
+    This class manages the Prompt Server, handling websockets, user management, and message queues.
+
+    It initializes the web application, sets up CORS headers, manages socket connections, and processes messages from clients.
+    """
+
+    instance = None
+
+    def __init__(self, loop: asyncio.AbstractEventLoop) -> None:
+        """
+        Initializes the PromptServer instance.
+
+        Args:
+            loop: The asyncio event loop to use.
+        """
+
         PromptServer.instance = self
 
         mimetypes.init()
@@ -74,7 +132,7 @@ class PromptServer():
         self.supports = ["custom_nodes_from_web"]
         self.prompt_queue = None
         self.loop = loop
-        self.messages = asyncio.Queue()
+        self.messages: asyncio.Queue = asyncio.Queue()
         self.number = 0
 
         middlewares = [cache_control]
@@ -90,7 +148,7 @@ class PromptServer():
                 allow_headers="*",
             )
         })
-        self.sockets = dict()
+        self.sockets: Dict[Any, Any] = dict()
         self.web_root = os.path.join(os.path.dirname(
             os.path.realpath(__file__)), "web/dist")
         routes = web.RouteTableDef()
@@ -98,10 +156,12 @@ class PromptServer():
         self.last_node_id = None
         self.client_id = None
 
-        self.on_prompt_handlers = []
+        self.on_prompt_handlers: List = []
 
         @routes.get('/ws')
-        async def websocket_handler(request):
+        async def websocket_handler(request: web.Request) -> web.WebSocketResponse:
+            """Handles websocket connections and manages client state."""
+
             ws = web.WebSocketResponse()
             await ws.prepare(request)
             sid = request.rel_url.query.get('clientId', '')
@@ -128,17 +188,23 @@ class PromptServer():
             return ws
 
         @routes.get("/")
-        async def get_root(request):
+        async def get_root(request: web.Request) -> web.FileResponse:
+            """Serves the main index.html file."""
+
             return web.FileResponse(os.path.join(self.web_root, "index.html"))
 
         @routes.get("/embeddings")
         def get_embeddings(self):
+            """Returns a list of available embedding filenames."""
+
             embeddings = folder_paths.get_filename_list("embeddings")
             return web.json_response(list(map(lambda a: os.path.splitext(a)[0], embeddings)))
         
         # Returns relative paths where extensions (as static files) can be loaded from
         @routes.get("/extensions")
-        async def get_extensions(request):
+        async def get_extensions(request: web.Request) -> web.Response:
+            """Returns a list of all extension files."""
+
             files = glob.glob(os.path.join(
                 glob.escape(self.web_root), 'extensions/**/*.js'), recursive=True)
             
@@ -151,7 +217,18 @@ class PromptServer():
 
             return web.json_response(extensions)
 
-        def get_dir_by_type(dir_type):
+        def get_dir_by_type(dir_type: str | None) -> tuple[str, str]:
+            """
+            Gets the appropriate directory path based on the provided type.
+
+            Args:
+                dir_type (str | None): The type of directory to retrieve. Can be "input", "temp", or "output".
+                    If None is provided, defaults to "input".
+
+            Returns:
+                tuple[str, str]: A tuple containing the directory path and the provided type.
+            """
+
             if dir_type is None:
                 dir_type = "input"
 
@@ -164,7 +241,27 @@ class PromptServer():
 
             return type_dir, dir_type
 
-        def image_upload(post, image_save_function=None):
+        def image_upload(post, image_save_function: Callable | None = None) -> web.Response:
+            """
+            Handles image uploads, saving the image and returning information about it.
+
+            Args:
+                post: Contains the image data.
+                    Expected keys:
+                        - image (aiohttp.MultipartFormData.ContentDisposition): The image file object.
+                        - overwrite (str): A string indicating whether to overwrite existing files ("true" or "1").
+                        - type (str): The type of upload (e.g., "input", "output").
+                image_save_function (callable, optional): A custom function to handle image saving logic.
+                    If not provided, the image will be saved to the file system.
+
+            Returns:
+                web.Response: A JSON response containing information about the uploaded image.
+                    Includes:
+                        - name (str): The filename of the uploaded image.
+                        - subfolder (str): The subfolder where the image is saved (if provided).
+                        - type (str): The type of upload provided in the request.
+            """
+
             image = post.get("image")
             overwrite = post.get("overwrite")
 
@@ -208,16 +305,51 @@ class PromptServer():
                 return web.Response(status=400)
 
         @routes.post("/upload/image")
-        async def upload_image(request):
+        async def upload_image(request: web.Request) -> web.Response:
+            """
+            Handles image upload requests.
+
+            Expects the request body to be a multipart form containing the image data.
+            Forwards the data to the `image_upload` function for processing.
+
+            Args:
+                request (web.Request): The incoming web request object.
+
+            Returns:
+                web.Response: The response object containing the upload result.
+            """
+
             post = await request.post()
             return image_upload(post)
 
 
         @routes.post("/upload/mask")
-        async def upload_mask(request):
+        async def upload_mask(request: web.Request) -> web.Response:
+            """
+            Handles mask image upload requests.
+
+            Receives a multipart form containing a mask image and information about the
+            original image to combine with. Validates the request data and saves the
+            masked image using the provided information.
+
+            Args:
+                request (web.Request): The incoming web request.
+
+            Returns:
+                web.Response: The response object containing the upload result.
+            """
+
             post = await request.post()
 
-            def image_save_function(image, post, filepath):
+            def image_save_function(image, post, filepath: str):
+                """Handles saving the masked image based on the provided data.
+
+                Args:
+                    image: The mask image object.
+                    post: The request data.
+                    filepath: The filepath where the masked image should be saved.
+                """
+
                 original_ref = json.loads(post.get("original_ref"))
                 filename, output_dir = folder_paths.annotated_filepath(original_ref['filename'])
 

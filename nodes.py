@@ -3,12 +3,14 @@ import torch
 import os
 import sys
 import json
-import hashlib
+# import hashlib
+import blake3
 import traceback
 import math
 import time
 import random
 import logging
+import io
 
 from PIL import Image, ImageOps, ImageSequence
 from PIL.PngImagePlugin import PngInfo
@@ -599,10 +601,18 @@ class LoadLatent:
     @classmethod
     def IS_CHANGED(s, latent):
         image_path = folder_paths.get_annotated_filepath(latent)
-        m = hashlib.sha256()
         with open(image_path, 'rb') as f:
-            m.update(f.read())
-        return m.digest().hex()
+            file_content = f.read()
+
+            # Open the image using PIL
+            image = Image.open(io.BytesIO(file_content))
+
+            # Get the pixel data
+            pixel_data = image.tobytes()
+
+            hash = blake3.blake3(pixel_data).hexdigest()
+
+        return hash
 
     @classmethod
     def VALIDATE_INPUTS(s, latent):
@@ -1611,10 +1621,18 @@ class LoadImage:
     @classmethod
     def IS_CHANGED(s, image):
         image_path = folder_paths.get_annotated_filepath(image)
-        m = hashlib.sha256()
         with open(image_path, 'rb') as f:
-            m.update(f.read())
-        return m.digest().hex()
+            file_content = f.read()
+
+            # Open the image using PIL
+            image = Image.open(io.BytesIO(file_content))
+
+            # Get the pixel data
+            pixel_data = image.tobytes()
+
+            hash = blake3.blake3(pixel_data).hexdigest()
+            
+        return hash
 
     @classmethod
     def VALIDATE_INPUTS(s, image):
@@ -1660,10 +1678,18 @@ class LoadImageMask:
     @classmethod
     def IS_CHANGED(s, image, channel):
         image_path = folder_paths.get_annotated_filepath(image)
-        m = hashlib.sha256()
         with open(image_path, 'rb') as f:
-            m.update(f.read())
-        return m.digest().hex()
+            file_content = f.read()
+
+            # Open the image using PIL
+            image = Image.open(io.BytesIO(file_content))
+
+            # Get the pixel data
+            pixel_data = image.tobytes()
+
+            hash = blake3.blake3(pixel_data).hexdigest()
+
+        return hash
 
     @classmethod
     def VALIDATE_INPUTS(s, image):

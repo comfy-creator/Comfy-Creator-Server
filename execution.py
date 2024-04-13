@@ -12,6 +12,8 @@ import nodes
 
 import comfy.model_management
 
+from collections.abc import Iterator
+
 def get_input_data(
         inputs: Dict[str, Any], 
         class_def: Any, 
@@ -109,16 +111,35 @@ def map_node_over_list(
     if input_is_list:
         if allow_interrupt:
             nodes.before_node_execution()
-        results.append(getattr(obj, func)(**input_data_all))
+        result = getattr(obj, func)(**input_data_all)
+        if isinstance(result, Iterator):
+            results.extend(list(result))
+        else:
+            results.append(result)
     elif max_len_input == 0:
         if allow_interrupt:
             nodes.before_node_execution()
-        results.append(getattr(obj, func)())
+        result = getattr(obj, func)()
+        if isinstance(result, Iterator):
+            results.extend(list(result))
+        else:
+            results.append(result)
     else:
+        print("Inputs")
+        print(input_data_all)
+        print(max_len_input)
+        
         for i in range(max_len_input):
             if allow_interrupt:
                 nodes.before_node_execution()
-            results.append(getattr(obj, func)(**slice_dict(input_data_all, i)))
+            result = getattr(obj, func)(**slice_dict(input_data_all, i))
+            if isinstance(result, Iterator):
+                print("Result is iterator")
+                results.extend(list(result))
+            else:
+                print("Result is not iterator")
+                results.append(result)
+
     return results
 
 def get_output_data(
@@ -143,6 +164,9 @@ def get_output_data(
     results: List[Any] = []
     uis: List[Dict[str, Any]] = []
     return_values = map_node_over_list(obj, input_data_all, obj.FUNCTION, allow_interrupt=True)
+
+    # breakpoint()
+
 
     for r in return_values:
         if isinstance(r, dict):
@@ -234,6 +258,8 @@ def recursive_execute(
     class_def = nodes.NODE_CLASS_MAPPINGS[class_type]
     if unique_id in outputs:
         return (True, None, None)
+    
+    breakpoint()
 
     for x in inputs:
         input_data = inputs[x]
@@ -305,6 +331,7 @@ def recursive_execute(
     return (True, None, None)
 
 def recursive_will_execute(prompt, outputs, current_item, memo={}):
+    breakpoint()
     unique_id = current_item
 
     if unique_id in memo:
@@ -516,6 +543,7 @@ def validate_inputs(prompt, item, validated):
     unique_id = item
     if unique_id in validated:
         return validated[unique_id]
+    
 
     inputs = prompt[unique_id]['inputs']
     class_type = prompt[unique_id]['class_type']

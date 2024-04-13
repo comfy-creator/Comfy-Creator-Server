@@ -31,6 +31,7 @@ from custom_types import QueueJobRequest, WorkflowStep, SerializedGraph
 from app.user_manager import UserManager
 from static_file_server import serve_react_app
 from typing import List, Dict, IO, Callable, Awaitable, Any
+from pathlib import Path
 
 class BinaryEventTypes:
     PREVIEW_IMAGE = 1
@@ -476,6 +477,38 @@ class PromptServer():
 
             return web.Response(status=404)
 
+
+        @routes.get("/view_all")
+        async def view_all_images(request):
+            output_dir = folder_paths.get_directory_by_type("output")
+
+            # Check if output directory exists
+            if not os.path.isdir(output_dir):
+                return web.Response(status=404)
+
+            # Get page number and size from query parameters
+            page = int(request.rel_url.query.get("page", "1"))
+            page_size = int(request.rel_url.query.get("page_size", "10"))
+
+            # Get all image files in the output directory
+            files = [str(file) for file in Path(output_dir).rglob("*") if file.is_file() and file.suffix in ['.png', '.jpg', '.jpeg', '.webp']]
+
+            # Paginate files
+            start = (page - 1) * page_size
+            end = start + page_size
+            files_page = files[start:end]
+
+            # Create response data
+            data = {
+                "page": page,
+                "page_size": page_size,
+                "total_pages": len(files) // page_size + (1 if len(files) % page_size > 0 else 0),
+                "files": files_page
+            }
+
+            return web.json_response(data)
+
+
         @routes.get("/view_metadata/{folder_name}")
         async def view_metadata(request):
             folder_name = request.match_info.get("folder_name", None)
@@ -609,6 +642,7 @@ class PromptServer():
             if "prompt" in json_data:
                 prompt = json_data["prompt"]
                 valid = execution.validate_prompt(prompt)
+                breakpoint()
                 extra_data = {}
                 if "extra_data" in json_data:
                     extra_data = json_data["extra_data"]

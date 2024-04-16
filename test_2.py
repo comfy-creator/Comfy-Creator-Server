@@ -4,14 +4,14 @@ import json
 import aiohttp
 import y_py as Y
 
-async def run_test():
-    server_url = "http://127.0.0.1:8188"
-    ws_uri = f"ws://127.0.0.1:8188/ws"
+async def run_client():
+    server_url = "http://127.0.0.1:8188" 
+    uri = "ws://127.0.0.1:8188/ws"
 
-    ydoc = Y.YDoc()  # Create a Yjs document to store the progressive outputs
-    provider = None 
+    ydoc = Y.YDoc()  # Local Yjs document
+    provider = None  # You can add a provider for real-time collaboration (e.g., WebrtcProvider)
 
-    # Define a sample workflow with "workflows" output structure
+    # Define and send a sample workflow (use your actual workflow here)
     workflow = {
         '375da500-7d7f-46c9-82f7-d6ef89761a97': 
             {
@@ -24,7 +24,7 @@ async def run_test():
                 'class_type': 'SaveImage', 
                 '_meta': {'title': 'Save Image'}, 
                 'inputs': {'images': ['375da500-7d7f-46c9-82f7-d6ef89761a97', 0], 
-                           'filename_prefix': 'ComfyUI'}
+                        'filename_prefix': 'ComfyUI'}
             },
         'outputs':{
             'images': [ "4a205b27-a663-4923-bd36-50e4968eb15e", 0 ],
@@ -41,30 +41,33 @@ async def run_test():
                 print("Error submitting prompt:", await response.text())
                 return
 
-    # Connect to the websocket to receive updates
-    async with websockets.connect(ws_uri) as websocket:
-        # Receive and process progressive outputs and updates
+    async with websockets.connect(uri) as websocket:
+        
+        await websocket.send(json.dumps({"prompt": workflow}))
+
+        # Receive and process messages from the server
         while True:
             message = await websocket.recv()
             data = json.loads(message)
 
-            print(message)
-
             if data["type"] == "yjs_update":
                 # Apply Yjs update to the local document
-                update_data_str = json.dumps(data["data"]) 
-                update_data = update_data_str.encode()
-                Y.apply_update(ydoc, message)
+                update_data = data["data"]
+                Y.apply_update(ydoc, update_data.encode())  # Encode update data before applying
 
-                # Access and display the progressive outputs
+                # Access and process the updated outputs
                 output_map = ydoc.get_map("workflows")
-                if output_map.get("images"):
-                    images_data = json.loads(output_map.get("images"))
-                    print("Received images data:", images_data)
+                if output_map.get("latent_image"):
+                    latent_image_data = json.loads(output_map.get("latent_image"))
+                    print("Received latent image data:", latent_image_data)
+                if output_map.get("generated_image"):
+                    generated_image_data = json.loads(output_map.get("generated_image"))
+                    print("Received generated image data:", generated_image_data)
+                    # You can further process the image data here (e.g., save to a file, display)
+
             elif data["type"] == "status":
-                # Process status updates from the server
                 print("Status update:", data["data"])
             else:
                 print("Received message:", data)
 
-asyncio.run(run_test())
+asyncio.run(run_client())

@@ -21,6 +21,7 @@ venv/
 /user/
 *error.log
 
+
 **/node_modules/
 .env.*
 !.env.*example

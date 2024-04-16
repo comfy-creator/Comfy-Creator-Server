@@ -1560,7 +1560,9 @@ class SaveImage:
             })
             counter += 1
 
-        return { "ui": { "images": results } }
+        print(results)
+
+        yield (subfolder+file, )
 
 class PreviewImage(SaveImage):
     def __init__(self):

@@ -32,6 +32,9 @@ from app.user_manager import UserManager
 from static_file_server import serve_react_app
 from typing import List, Dict, IO, Callable, Awaitable, Any
 from pathlib import Path
+import y_py as Y
+
+
 
 class BinaryEventTypes:
     PREVIEW_IMAGE = 1
@@ -135,6 +138,9 @@ class PromptServer():
         self.loop = loop
         self.messages: asyncio.Queue = asyncio.Queue()
         self.number = 0
+
+        self.ydoc = Y.YDoc()
+        self.output_map = self.ydoc.get_map("workflows")
 
         middlewares = [cache_control]
         if args.enable_cors_header:
@@ -642,7 +648,7 @@ class PromptServer():
             if "prompt" in json_data:
                 prompt = json_data["prompt"]
                 valid = execution.validate_prompt(prompt)
-                breakpoint()
+                # breakpoint()
                 extra_data = {}
                 if "extra_data" in json_data:
                     extra_data = json_data["extra_data"]
@@ -654,6 +660,7 @@ class PromptServer():
                     outputs_to_execute = valid[2]
                     self.prompt_queue.put((number, prompt_id, prompt, extra_data, outputs_to_execute))
                     response = {"prompt_id": prompt_id, "number": number, "node_errors": valid[3]}
+                    print(response)
                     return web.json_response(response)
                 else:
                     logging.warning("invalid prompt: {}".format(valid[1]))
@@ -811,6 +818,15 @@ class PromptServer():
         while True:
             msg = await self.messages.get()
             await self.send(*msg)
+
+    def broadcast_yjs_updates(self):
+        """Encodes and sends Yjs updates to connected clients."""
+        update = self.ydoc.encode_state_as_update() 
+        update_data = bytes(update) 
+        # Send update_data to clients through websockets (implementation depends on your websocket framework)
+        # Example using websockets library:
+        for ws in self.sockets.values():
+            asyncio.create_task(ws.send(json.dumps({"type": "yjs_update", "data": update_data})))
 
     async def start(self, address, port, verbose=True, call_on_start=None):
         runner = web.AppRunner(self.app, access_log=None)

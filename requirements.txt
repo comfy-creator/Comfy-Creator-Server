@@ -1,6 +1,4 @@
-torch
 torchsde
-torchvision
 einops
 transformers>=4.36.2
 safetensors>=0.4.1
@@ -11,3 +9,21 @@ scipy
 tqdm
 psutil
 kornia>=0.7.1
+
+# Requirements for comfy_ts/start.sh to run on startup
+jupyterlab
+ipywidgets
+jupyter-archive
+jupyter_contrib_nbextensions
+notebook>=6.5.5
+widgetsnbextension
+xformers>=0.0.23
+gdown
+
+# Because custom node authors don't know how to create a proper requirements file
+cupy-cuda12x
+kornia
+openai-clip
+open-clip-torch
+pytorch_lightning
+

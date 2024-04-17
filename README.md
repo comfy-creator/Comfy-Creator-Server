@@ -11,6 +11,26 @@ Project goals:
 
 ### Requirements
 
+- Python 3.8+
+
+### Installation
+
+- Clone this repo
+- Run `python -m venv venv` and `Source ./venv/Scripts/activate`; this will create a virtual environment and activate it.
+- Run `pip install -r requirements.txt`; this will install all dependencies. Possibly also try `pip install -r requirements.optional.txt` as well if you're not on Windows.
+- Next, install pytorch using one of the following commands, depending on the environment you're running in:
+
+Nvidia GPUs: `pip install --pre torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cu121` to install Pytorch for your Nvidia CUDA.
+
+AMD GPUs (Linux): `pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/rocm5.7`
+
+### Running
+
+- Run `poetry run python main.py` to start the gen-server
+
+
+### Requirements
+
 You need the following installed locally: 
 
 - Python 3.10+

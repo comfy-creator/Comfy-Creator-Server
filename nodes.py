@@ -39,6 +39,13 @@ import latent_preview
 import node_helpers
 
 from typing import Dict, List, Optional, Tuple, Union, Any
+import requests
+from dotenv import load_dotenv
+
+
+load_dotenv()
+
+
 
 def before_node_execution():
     comfy.model_management.throw_exception_if_processing_interrupted()
@@ -1451,6 +1458,115 @@ class KSampler:
     def sample(self, model, seed, steps, cfg, sampler_name, scheduler, positive, negative, latent_image, denoise=1.0):
         return common_ksampler(model, seed, steps, cfg, sampler_name, scheduler, positive, negative, latent_image, denoise=denoise)
 
+
+# --------------------------------------- Stable Diffusion API Node ----------------------------------------------------- #
+class SDAPI:
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {
+                "prompt": ("STRING", {"multiline": True}),
+                "aspect_ratio": (["16:9", "4:3", "1:1"], {"default": "1:1"}),
+                "mode": (["text-to-image", "image-to-image"], {"default": "text-to-image"}),
+                "seed": ("INT", {"default": 0, "min": 0, "max": 4294967294 }),
+                "output_format": ([ "png", "jpeg", "webp" ], {"default": "png"}),
+            }
+        }
+
+    RETURN_TYPES = ("IMAGE",)
+    FUNCTION = "generate"
+
+    CATEGORY = "sd3"
+
+    def generate(self, prompt, aspect_ratio, mode, seed, output_format):
+
+        data = {
+            "prompt": prompt,
+            "aspect_ratio": aspect_ratio,
+            "mode": mode,
+            "output_format": output_format,
+        }
+
+        if seed:
+            data["seed"] = seed
+
+
+        print(data)
+        
+
+        response = requests.post(
+            f"https://api.stability.ai/v2beta/stable-image/generate/sd3",
+            headers={
+                "authorization": os.getenv("STABILITY_API_KEY"),
+                "accept": "image/*"
+            },
+            files={"none": ''},
+            data=data,
+        )
+
+        print(response.status_code)
+        response.raise_for_status()
+
+
+        return (response.content, )
+
+
+class SDAPISaveImage:
+    def __init__(self):
+        self.output_dir = folder_paths.get_output_directory()
+
+    @classmethod
+    def INPUT_TYPES(s):
+        return {"required": {"image_content": ("IMAGE",),
+                              "filename_prefix": ("STRING", {"default": "SDAPI"})}}
+    RETURN_TYPES = ()
+    FUNCTION = "save"
+
+    OUTPUT_NODE = True
+
+    CATEGORY = "sd3"
+
+    def save(self, image_content, filename_prefix="SDAPI"):
+        full_output_folder, filename, counter, subfolder, filename_prefix = folder_paths.get_save_image_path(filename_prefix, self.output_dir)
+        file = f"{filename}_{counter:05}_.png"
+        filepath = os.path.join(full_output_folder, file)
+
+        with open(filepath, "wb") as f:
+            f.write(image_content)
+
+        results = [{"filename": file, "subfolder": subfolder, "type": "output"}]
+        return {"ui": {"images": results}}
+
+
+class SDAPIPreviewImage:
+    def __init__(self):
+        self.temp_dir = folder_paths.get_temp_directory()
+
+    @classmethod
+    def INPUT_TYPES(s):
+        return {"required": {"image_content": ("IMAGE",)}}
+    RETURN_TYPES = ()
+    FUNCTION = "preview"
+
+    OUTPUT_NODE = True
+
+    CATEGORY = "sd3"
+
+    def preview(self, image_content):
+        prefix = "_temp_" + ''.join(random.choice("abcdefghijklmnopqrstupvxyz") for _ in range(5))
+        full_output_folder, filename, counter, subfolder, filename_prefix = folder_paths.get_save_image_path(prefix, self.temp_dir)
+        file = f"{filename}_{counter:05}_.png"
+        filepath = os.path.join(full_output_folder, file)
+
+        with open(filepath, "wb") as f:
+            f.write(image_content)
+
+        results = [{"filename": file, "subfolder": subfolder, "type": "temp"}]
+        return {"ui": {"images": results}}
+
+
+
+
 class KSamplerAdvanced:
     @classmethod
     def INPUT_TYPES(s):
@@ -1533,9 +1649,8 @@ class SaveImage:
             })
             counter += 1
 
-        print(results)
 
-        yield (subfolder+file, )
+        return { "ui": { "images": results } }
 
 class PreviewImage(SaveImage):
     def __init__(self):
@@ -1842,6 +1957,9 @@ class ImagePadForOutpaint:
 
 
 NODE_CLASS_MAPPINGS = {
+    "SDAPISaveImage": SDAPISaveImage,
+    "SDAPIPreviewImage": SDAPIPreviewImage,
+    "SDAPI": SDAPI,
     "KSampler": KSampler,
     "CheckpointLoaderSimple": CheckpointLoaderSimple,
     "CLIPTextEncode": CLIPTextEncode,
@@ -1911,6 +2029,10 @@ NODE_CLASS_MAPPINGS = {
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
+    # Diffusion
+    "SDAPI": "Stable Diffusion API",
+    "SDAPISaveImage": "SDAPI Save Image",
+    "SDAPIPreviewImage": "SDAPI Preview Image",
     # Sampling
     "KSampler": "KSampler",
     "KSamplerAdvanced": "KSampler (Advanced)",

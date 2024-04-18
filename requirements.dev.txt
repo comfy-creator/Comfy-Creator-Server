@@ -1,0 +1,4 @@
+# MyPy Type stubs
+mypy
+aiohttp_cors
+types-PyYAML

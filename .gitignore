@@ -20,7 +20,6 @@ venv/
 /tests-ui/data/object_info.json
 /user/
 *error.log
-/web/
 .env
 
 

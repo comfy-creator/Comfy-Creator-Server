@@ -38,9 +38,12 @@ import folder_paths
 import latent_preview
 import node_helpers
 
-from typing import Dict, List, Optional, Tuple, Union, Any
+from typing import Dict, List, Optional, Tuple, Union, Any, BinaryIO
 import requests
 from dotenv import load_dotenv
+import boto3
+from helper_decorators import convert_image_format
+from urllib.parse import urlparse
 
 
 load_dotenv()
@@ -1459,17 +1462,28 @@ class KSampler:
         return common_ksampler(model, seed, steps, cfg, sampler_name, scheduler, positive, negative, latent_image, denoise=denoise)
 
 
-# --------------------------------------- Stable Diffusion API Node ----------------------------------------------------- #
+# --------------------------------------- Stability API Node ----------------------------------------------------- #
 class SDAPI:
+
+    def __init__(self):
+        pass
+
+    
     @classmethod
     def INPUT_TYPES(s):
         return {
             "required": {
-                "prompt": ("STRING", {"multiline": True}),
-                "aspect_ratio": (["16:9", "4:3", "1:1"], {"default": "1:1"}),
-                "mode": (["text-to-image", "image-to-image"], {"default": "text-to-image"}),
+                "positive": ("STRING", {"default": "Worlds colliding", "multiline": True}),
+                "negative": ("STRING", {"default": "best quality, high quality", "multiline": True}),
+                "aspect_ratio": (["21:9", "16:9", "5:4", "3:2", "1:1", "2:3", "4:5", "9:16", "9:21"], {"default": "1:1"}),
                 "seed": ("INT", {"default": 0, "min": 0, "max": 4294967294 }),
                 "output_format": ([ "png", "jpeg", "webp" ], {"default": "png"}),
+                "model": (["sd3", "sd3-turbo"],),
+            },
+
+            "optional": {
+                "image": ("IMAGE",),  
+                "strength": ("FLOAT", {"default": 0.7, "min": 0, "max": 1.0, "step": 0.01}),
             }
         }
 
@@ -1478,20 +1492,64 @@ class SDAPI:
 
     CATEGORY = "sd3"
 
-    def generate(self, prompt, aspect_ratio, mode, seed, output_format):
-
-        data = {
-            "prompt": prompt,
-            "aspect_ratio": aspect_ratio,
-            "mode": mode,
-            "output_format": output_format,
-        }
-
-        if seed:
-            data["seed"] = seed
+    @convert_image_format
+    def generate(self, positive: str, negative: str, aspect_ratio: List[str], seed, output_format, model, image: BinaryIO = None, strength=None):
 
 
-        print(data)
+        if model == "sd3-turbo":
+            if image is None:
+                files = {"none": ''}
+                data = {
+                    "prompt": positive,
+                    "aspect_ratio": aspect_ratio,
+                    "mode": "text-to-image",
+                    "output_format": output_format,
+                    "seed": seed,
+                    "model": model
+                }
+
+            else:
+                files={
+                        "image": ("image.png", image, 'image/png'), 
+                    }
+
+                data = {
+                    "prompt": positive,
+                    "mode": "image-to-image",
+                    "model": model,
+                    "seed": seed,
+                    "strength": strength,
+                    "output_format": output_format,
+                    "image": image
+                }
+
+        elif model == "sd3":
+            if image is None:
+                files = {"none": ''}
+                data={
+                    "prompt": positive,
+                    "negative_prompt": negative,
+                    "aspect_ratio": aspect_ratio,
+                    "mode": "text-to-image",
+                    "model": model,
+                    "seed": seed,
+                    "output_format": output_format,
+                }
+            else:
+
+                files={
+                        "image": ("image.png", image, 'image/png'), 
+                    }
+
+                data = {
+                    "prompt": positive,
+                    "negative_prompt": negative,
+                    "mode": "image-to-image",
+                    "model": model,
+                    "seed": seed,
+                    "strength": strength,
+                    "output_format": output_format,
+                }
         
 
         response = requests.post(
@@ -1500,15 +1558,15 @@ class SDAPI:
                 "authorization": os.getenv("STABILITY_API_KEY"),
                 "accept": "image/*"
             },
-            files={"none": ''},
+            files=files,
             data=data,
         )
 
-        print(response.status_code)
-        response.raise_for_status()
+        if response.status_code == 200:
 
-
-        return (response.content, )
+            return (response.content, )
+        else:
+            print(f"Error: {response.status_code}")
 
 
 class SDAPISaveImage:
@@ -1552,7 +1610,8 @@ class SDAPIPreviewImage:
 
     CATEGORY = "sd3"
 
-    def preview(self, image_content):
+    @convert_image_format
+    def preview(self, image_content: bytes):
         prefix = "_temp_" + ''.join(random.choice("abcdefghijklmnopqrstupvxyz") for _ in range(5))
         full_output_folder, filename, counter, subfolder, filename_prefix = folder_paths.get_save_image_path(prefix, self.temp_dir)
         file = f"{filename}_{counter:05}_.png"
@@ -1563,6 +1622,128 @@ class SDAPIPreviewImage:
 
         results = [{"filename": file, "subfolder": subfolder, "type": "temp"}]
         return {"ui": {"images": results}}
+    
+
+@convert_image_format
+def save_image_to_respective_path(prefix_append, output_dir, 
+                                      images: torch.Tensor, filename_prefix, prompt, 
+                                      extra_pnginfo, compress_level,
+                                      type, results):
+        
+        filename_prefix += prefix_append
+        full_output_folder, filename, counter, subfolder, filename_prefix = folder_paths.get_save_image_path(
+            filename_prefix, output_dir, images[0].shape[1], images[0].shape[0]
+        )
+        for batch_number, image in enumerate(images):
+            i = 255. * image.cpu().numpy()
+            img = Image.fromarray(np.clip(i, 0, 255).astype(np.uint8))
+            metadata: Optional[PngInfo] = None
+            if not args.disable_metadata:
+                metadata = PngInfo()
+                if prompt is not None:
+                    metadata.add_text("prompt", json.dumps(prompt))
+                if extra_pnginfo is not None:
+                    for x in extra_pnginfo:
+                        metadata.add_text(x, json.dumps(extra_pnginfo[x]))
+
+            
+            filename_with_batch_num = filename.replace("%batch_num%", str(batch_number))
+            file = f"{filename_with_batch_num}_{counter:05}_.png"
+            img.save(os.path.join(full_output_folder, file), pnginfo=metadata, compress_level=compress_level)
+            results.append({"filename": file, "subfolder": subfolder, "type": type})
+            counter += 1
+
+
+class SaveAndPreviewImage:
+    def __init__(self) -> None:
+        self.output_dir = folder_paths.get_output_directory()
+        self.temp_dir = folder_paths.get_temp_directory()
+        self.type = "output"
+        self.prefix_append = ""
+        self.temp_prefix_append = "_temp_" + ''.join(random.choice("abcdefghijklmnopqrstupvxyz") for _ in range(5))
+        self.compress_level = 4
+        self.temp_compress_level = 1
+
+    @classmethod
+    def INPUT_TYPES(s) -> Dict[str, Union[Tuple[str, ...], Tuple[str, Dict[str, Union[str, int]]]]]:
+        return {
+            "required": {
+                "images": ("IMAGE", ),
+                "filename_prefix": ("STRING", {"default": "ComfyUI"}),
+                # "save_images": ("BOOLEAN", {"default": False}),
+                "save_type": (["local", "s3"], {"default": "local"}),
+                "bucket_name": ("STRING", {"default": "my-bucket"}),
+            },
+            "hidden": {"prompt": "PROMPT", "extra_pnginfo": "EXTRA_PNGINFO"},
+        }
+
+    RETURN_TYPES: Tuple = ()
+    FUNCTION = "save_and_preview_images"
+
+    OUTPUT_NODE = True
+
+    CATEGORY = "image"
+
+
+    def save_and_preview_images(
+        self,
+        images: List[Union[torch.Tensor, bytes]],
+        filename_prefix: str = "ComfyUI",
+        # save_images: bool = False,
+        save_type: str = "local",
+        bucket_name: str = "my-bucket",
+        prompt = None,
+        extra_pnginfo = None,
+    ) -> Dict[str, Dict[str, List[Dict[str, Union[str, None]]]]]:
+        
+        results: List[Dict[str, Union[str, None]]] = []
+
+
+
+        save_image_to_respective_path(self.temp_prefix_append, 
+                                      self.temp_dir, images, filename_prefix, prompt, 
+                                      extra_pnginfo, self.temp_compress_level, "temp", results)
+
+        if save_type == "local":
+            save_image_to_respective_path(self.prefix_append, self.output_dir, images, 
+                                          filename_prefix, prompt, extra_pnginfo, 
+                                          self.compress_level, self.type, results=[])
+        elif save_type == "s3":
+            print("Here")
+            if isinstance(images, bytes) or isinstance(images, torch.Tensor):
+                print("Here 2")
+                file = results[0]["filename"]
+                image_url = self.upload_to_s3(images, file, bucket_name)
+                print(image_url )
+
+                results[-1]["output"] = {"image_url": image_url}
+
+        print(results)
+
+        return {"ui": {"images": results}}
+    
+    @convert_image_format
+    def upload_to_s3(self, image_data: bytes, filename, bucket_name):
+        
+        # Configure your S3 client with access keys, endpoint URL, region, and bucket name
+        session = boto3.Session(
+            aws_access_key_id=os.getenv("DO_ACCESS_KEY_ID"),
+            aws_secret_access_key=os.getenv("DO_SECRET_ACCESS_KEY"),
+            region_name=os.getenv("REGION_NAME"),
+        )
+        s3_client = session.client("s3", endpoint_url=os.getenv("DO_ENDPOINT_URL"))
+        bucket_name = os.getenv("BUCKET_NAME")
+
+        key = f"comfy-test/{filename}"
+
+        # Upload the image data
+        s3_client.put_object(Bucket=bucket_name, Key=key, Body=image_data, ACL="public-read")
+
+        # Generate and return the image URL
+        endpoint_url = s3_client.meta.endpoint_url
+        hostname = urlparse(endpoint_url).hostname
+        return f"https://{bucket_name}.{hostname}/{key}"
+
 
 
 
@@ -1623,6 +1804,7 @@ class SaveImage:
 
     CATEGORY = "image"
 
+    @convert_image_format
     def save_images(self, images, filename_prefix="ComfyUI", prompt=None, extra_pnginfo=None):
         filename_prefix += self.prefix_append
         full_output_folder, filename, counter, subfolder, filename_prefix = folder_paths.get_save_image_path(filename_prefix, self.output_dir, images[0].shape[1], images[0].shape[0])
@@ -1954,6 +2136,9 @@ class ImagePadForOutpaint:
         mask[top:top + d2, left:left + d3] = t
 
         return (new_image, mask)
+
+
+
 
 
 NODE_CLASS_MAPPINGS = {

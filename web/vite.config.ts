@@ -7,40 +7,19 @@ import dts from 'vite-plugin-dts';
 import { libInjectCss } from 'vite-plugin-lib-inject-css';
 import { glob } from 'glob';
 
-const { dependencies, peerDependencies } = JSON.parse(fs.readFileSync(`./package.json`, 'utf8'));
-
 // https://vitejs.dev/config/
 export default defineConfig({
+  plugins: [react()],
   build: {
-    target: 'es2017',
-    lib: {
-      entry: resolve(__dirname, 'lib/main.ts'),
-      formats: ['es']
-    },
-    emptyOutDir: true,
-    // sourcemap: true,
-    minify: true,
     rollupOptions: {
-      external: [
-        // ...Object.keys(dependencies || {}),
-        ...Object.keys(peerDependencies || {})
-      ],
-      input: Object.fromEntries(
-        glob.sync('src/**/*.{ts,tsx}').map((file) => [
-          // The name of the entry point
-          // lib/nested/foo.ts becomes nested/foo
-          relative('src', file.slice(0, file.length - extname(file).length)),
-          // The absolute path to the entry file
-          // lib/nested/foo.ts becomes /project/lib/nested/foo.ts
-          fileURLToPath(new URL(file, import.meta.url))
-        ])
-      ),
+      // Disable code splitting
       output: {
-        // Filenames outputted to dist
-        assetFileNames: 'assets/[name][extname]',
-        entryFileNames: '[name].js'
-      }
-    }
+        manualChunks: undefined,
+        // Name of bundle file
+        entryFileNames: 'bundle.js',
+      },
+    },
+    minify: true,
+    emptyOutDir: true
   },
-  plugins: [react(), libInjectCss(), dts({ include: ['lib/**/*.tsx', 'lib/**/*.ts'] })]
 });

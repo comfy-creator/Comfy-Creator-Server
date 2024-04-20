@@ -198,8 +198,9 @@ class PromptServer():
 
         @routes.get("/")
         async def get_root(request: web.Request) -> web.FileResponse:
-            """Serves the main index.html file."""
-
+            """Serves the graph-editor index.html file."""
+            
+            # TO DO: in the future, make sure this file exists
             return web.FileResponse(os.path.join(self.web_root, "index.html"))
 
         @routes.get("/embeddings")

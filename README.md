@@ -20,7 +20,7 @@ Project goals:
 - Run `pip install -r requirements.txt`; this will install all dependencies. Possibly also try `pip install -r requirements.optional.txt` as well if you're not on Windows.
 - Next, install pytorch using one of the following commands, depending on the environment you're running in:
 
-Nvidia GPUs: `pip install --pre torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cu121` to install Pytorch for your Nvidia CUDA.
+Nvidia GPUs: `pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cu121` to install Pytorch for your Nvidia CUDA.
 
 AMD GPUs (Linux): `pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/rocm5.7`
 

@@ -1,17 +1,22 @@
-torchsde
-einops
-transformers>=4.36.2
-safetensors>=0.4.1
 aiohttp
-pyyaml
-Pillow
-scipy
-tqdm
-psutil
-kornia>=0.7.1
+aiohttp_cors
 blake3
+boto3
+python-dotenv
+einops
+kornia>=0.7.1
+Pillow
+psutil
+pyyaml
+pydantic
+safetensors>=0.4.1
+scipy
+torchsde
+tqdm
+transformers>=4.36.2
+y_py
 
-# Requirements for comfy_ts/start.sh to run on startup
+# Requirements for build_files/start.sh to run on startup
 jupyterlab
 ipywidgets
 jupyter-archive

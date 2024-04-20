@@ -7,7 +7,7 @@ ENV SHELL=/bin/bash
 ENV PYTHONUNBUFFERED=1
 
 # Set the working directory in the docker container
-WORKDIR /inference-api
+WORKDIR /gen-server
 
 # Configure apt-get to automatically use noninteractive settings
 ENV DEBIAN_FRONTEND=noninteractive
@@ -81,7 +81,7 @@ COPY catfs /usr/local/bin
 # Installing rsfw-cache
 # WORKDIR /opt
 #RUN git clone https://github.com/m-arbaro/rsfw-cache
-# WORKDIR /inference-api
+# WORKDIR /gen-server
 # Creating mountpoint for tmpfs:
 # RUN mkdir /usr/share/memory
 
@@ -108,5 +108,5 @@ RUN dos2unix ./start.sh && \
 # RUN useradd -l -M appuser
 # USER appuser
 
-# Run the Comfy Inference Server, Jupyter Notebook, and NGINX Proxy
-CMD ["/inference-api/start.sh"]
+# Run the Comfy Generation Server, Jupyter Notebook, and NGINX Proxy
+CMD ["/gen-server/start.sh"]

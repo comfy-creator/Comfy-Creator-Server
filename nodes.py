@@ -1,14 +1,18 @@
+from __future__ import annotations
+
 import torch
 
 import os
 import sys
 import json
-import hashlib
+# import hashlib
+import blake3
 import traceback
 import math
 import time
 import random
 import logging
+import io
 
 from PIL import Image, ImageOps, ImageSequence
 from PIL.PngImagePlugin import PngInfo
@@ -36,6 +40,18 @@ import folder_paths
 import latent_preview
 import node_helpers
 
+from typing import Dict, List, Optional, Tuple, Union, Any, BinaryIO
+import requests
+from dotenv import load_dotenv
+import boto3
+from helper_decorators import convert_image_format
+from urllib.parse import urlparse
+
+
+load_dotenv()
+
+
+
 def before_node_execution():
     comfy.model_management.throw_exception_if_processing_interrupted()
 
@@ -46,42 +62,111 @@ MAX_RESOLUTION=16384
 
 class CLIPTextEncode:
     @classmethod
-    def INPUT_TYPES(s):
+    def INPUT_TYPES(s) -> Dict[str, Dict[str, Union[Tuple[str], Tuple[str, Dict]]]]:
+        """
+        Defines the expected input types for the layer.
+
+        Returns:
+            A dictionary specifying the required inputs and their properties.
+        """
         return {"required": {"text": ("STRING", {"multiline": True, "dynamicPrompts": True}), "clip": ("CLIP", )}}
+    
     RETURN_TYPES = ("CONDITIONING",)
     FUNCTION = "encode"
 
     CATEGORY = "conditioning"
 
-    def encode(self, clip, text):
+    def encode(self, clip: Any, text: str) -> Tuple[List[List[Union[torch.Tensor, Dict]]]]:
+        """
+        Encodes text using a CLIP model.
+
+        Args:
+            clip: A CLIP model object.
+            text: The text to be encoded. Can be multiline.
+
+        Returns:
+            A tuple containing a single-element list, where the element is another list representing the conditioning representation and its pooled output.
+        """
+
         tokens = clip.tokenize(text)
         cond, pooled = clip.encode_from_tokens(tokens, return_pooled=True)
         return ([[cond, {"pooled_output": pooled}]], )
 
 class ConditioningCombine:
+    """
+    This class combines two conditioning representations using element-wise addition.
+
+    It takes two conditioning representations as input and returns a new conditioning representation obtained by adding corresponding elements.
+    """
+
     @classmethod
-    def INPUT_TYPES(s):
+    def INPUT_TYPES(s) -> Dict[str, Dict[str, Tuple[str]]]:
+
         return {"required": {"conditioning_1": ("CONDITIONING", ), "conditioning_2": ("CONDITIONING", )}}
+    
     RETURN_TYPES = ("CONDITIONING",)
     FUNCTION = "combine"
 
     CATEGORY = "conditioning"
 
-    def combine(self, conditioning_1, conditioning_2):
+    def combine(self, conditioning_1: List[Union[torch.Tensor, Dict]], 
+                conditioning_2: List[Union[torch.Tensor, Dict]]) -> Tuple[List[Union[torch.Tensor, Dict]]]:
+        """
+        Combines two conditioning representations using element-wise addition.
+
+        Args:
+            conditioning_1: The first conditioning representation.
+            conditioning_2: The second conditioning representation.
+
+        Returns:
+            A tuple containing the combined conditioning representation.
+        """
+
         return (conditioning_1 + conditioning_2, )
 
-class ConditioningAverage :
+
+class ConditioningAverage:
+    """
+    This class implements a layer that performs a weighted average between a conditioning input and a target input.
+
+    The weights are determined by a `conditioning_to_strength` parameter, which ranges from 0.0 (all target) to 1.0 (all conditioning).
+    """
+
     @classmethod
-    def INPUT_TYPES(s):
-        return {"required": {"conditioning_to": ("CONDITIONING", ), "conditioning_from": ("CONDITIONING", ),
-                              "conditioning_to_strength": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01})
-                             }}
+    def INPUT_TYPES(s) -> Dict[str, Dict[str, Union[Tuple[str], Tuple[str, dict[str, float]]]]]:
+        """
+        Defines the expected input types for the layer.
+
+        Returns:
+            A dictionary specifying the required inputs and their properties.
+        """
+        return {
+            "required": {
+                "conditioning_to": ("CONDITIONING",),
+                "conditioning_from": ("CONDITIONING",),
+                "conditioning_to_strength": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01}),
+            }
+        }
+
     RETURN_TYPES = ("CONDITIONING",)
     FUNCTION = "addWeighted"
-
     CATEGORY = "conditioning"
 
-    def addWeighted(self, conditioning_to, conditioning_from, conditioning_to_strength):
+    def addWeighted(self, conditioning_to: List[Tuple[torch.Tensor, Dict]], conditioning_from: List[Tuple[torch.Tensor, Dict]],
+                    conditioning_to_strength: float = 1.0) -> Tuple[List[List[object]]]:
+        
+        """
+        Performs a weighted average between conditioning and target inputs.
+
+        Args:
+            conditioning_to: A list of tuples containing the target tensor and its metadata.
+            conditioning_from: A list of tuples containing the conditioning tensor and its metadata.
+            conditioning_to_strength: A float between 0.0 and 1.0 controlling the weight of the conditioning input.
+
+        Returns:
+            A tuple containing a list of lists, where each inner list represents the weighted average and metadata for a target element.
+        """
+
         out = []
 
         if len(conditioning_from) > 1:
@@ -110,7 +195,7 @@ class ConditioningAverage :
 
 class ConditioningConcat:
     @classmethod
-    def INPUT_TYPES(s):
+    def INPUT_TYPES(s) -> Dict[str, Dict[str, Tuple[str]]]:
         return {"required": {
             "conditioning_to": ("CONDITIONING",),
             "conditioning_from": ("CONDITIONING",),
@@ -121,6 +206,7 @@ class ConditioningConcat:
     CATEGORY = "conditioning"
 
     def concat(self, conditioning_to, conditioning_from):
+        
         out = []
 
         if len(conditioning_from) > 1:
@@ -137,8 +223,17 @@ class ConditioningConcat:
         return (out, )
 
 class ConditioningSetArea:
+    """
+    This class sets a specific area within a conditioning representation with a given strength.
+
+    It takes a conditioning representation, width, height, x-coordinate, y-coordinate, and strength as input.
+    The method modifies the conditioning representation by adding an entry representing the specified area with the provided strength.
+
+    The area is defined by a normalized bounding box `(height // 8, width // 8, y // 8, x // 8)`, where each value ranges from 0.0 to 1.0 representing the fraction of the conditioning representation covered.
+    """
+
     @classmethod
-    def INPUT_TYPES(s):
+    def INPUT_TYPES(s) -> Dict[str, Dict[str, Union[Tuple[str], Tuple[str, dict[str, float | int]]]]]:
         return {"required": {"conditioning": ("CONDITIONING", ),
                               "width": ("INT", {"default": 64, "min": 64, "max": MAX_RESOLUTION, "step": 8}),
                               "height": ("INT", {"default": 64, "min": 64, "max": MAX_RESOLUTION, "step": 8}),
@@ -151,11 +246,28 @@ class ConditioningSetArea:
 
     CATEGORY = "conditioning"
 
-    def append(self, conditioning, width, height, x, y, strength):
-        c = node_helpers.conditioning_set_values(conditioning, {"area": (height // 8, width // 8, y // 8, x // 8),
+    def append(self, conditioning: List[Tuple[torch.Tensor, Dict]],
+               width: int, height: int, x: int, y: int, strength: float) -> Tuple[List[List[object]]]:
+        """
+        Sets a specific area within a conditioning representation with a given strength.
+
+        Args:
+            conditioning: A list of tuples containing the conditioning tensor and its metadata.
+            width: The width of the area (in pixels).
+            height: The height of the area (in pixels).
+            x: The x-coordinate of the top-left corner of the area (in pixels).
+            y: The y-coordinate of the top-left corner of the area (in pixels).
+            strength: The strength of the area, controlling its influence.
+
+        Returns:
+            A tuple containing a single-element list, where the element is another list representing the modified conditioning representation.
+        """
+
+        def append(self, conditioning, width, height, x, y, strength):
+            c = node_helpers.conditioning_set_values(conditioning, {"area": (height // 8, width // 8, y // 8, x // 8),
                                                                 "strength": strength,
                                                                 "set_area_to_bounds": False})
-        return (c, )
+            return (c, )
 
 class ConditioningSetAreaPercentage:
     @classmethod
@@ -474,10 +586,18 @@ class LoadLatent:
     @classmethod
     def IS_CHANGED(s, latent):
         image_path = folder_paths.get_annotated_filepath(latent)
-        m = hashlib.sha256()
         with open(image_path, 'rb') as f:
-            m.update(f.read())
-        return m.digest().hex()
+            file_content = f.read()
+
+            # Open the image using PIL
+            image = Image.open(io.BytesIO(file_content))
+
+            # Get the pixel data
+            pixel_data = image.tobytes()
+
+            hash = blake3.blake3(pixel_data).hexdigest()
+
+        return hash
 
     @classmethod
     def VALIDATE_INPUTS(s, latent):
@@ -1343,6 +1463,293 @@ class KSampler:
     def sample(self, model, seed, steps, cfg, sampler_name, scheduler, positive, negative, latent_image, denoise=1.0):
         return common_ksampler(model, seed, steps, cfg, sampler_name, scheduler, positive, negative, latent_image, denoise=denoise)
 
+
+# --------------------------------------- Stability API Node ----------------------------------------------------- #
+class SDAPI:
+
+    def __init__(self):
+        pass
+
+    
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {
+                "positive": ("STRING", {"default": "Worlds colliding", "multiline": True}),
+                "negative": ("STRING", {"default": "best quality, high quality", "multiline": True}),
+                "aspect_ratio": (["21:9", "16:9", "5:4", "3:2", "1:1", "2:3", "4:5", "9:16", "9:21"], {"default": "1:1"}),
+                "seed": ("INT", {"default": 0, "min": 0, "max": 4294967294 }),
+                "output_format": ([ "png", "jpeg", "webp" ], {"default": "png"}),
+                "model": (["sd3", "sd3-turbo"],),
+            },
+
+            "optional": {
+                "image": ("IMAGE",),  
+                "strength": ("FLOAT", {"default": 0.7, "min": 0, "max": 1.0, "step": 0.01}),
+            }
+        }
+
+    RETURN_TYPES = ("IMAGE",)
+    FUNCTION = "generate"
+
+    CATEGORY = "sd3"
+
+    @convert_image_format
+    def generate(self, positive: str, negative: str, aspect_ratio: List[str], seed, output_format, model, image: BinaryIO = None, strength=None):
+
+
+        if model == "sd3-turbo":
+            if image is None:
+                files = {"none": ''}
+                data = {
+                    "prompt": positive,
+                    "aspect_ratio": aspect_ratio,
+                    "mode": "text-to-image",
+                    "output_format": output_format,
+                    "seed": seed,
+                    "model": model
+                }
+
+            else:
+                files={
+                        "image": ("image.png", image, 'image/png'), 
+                    }
+
+                data = {
+                    "prompt": positive,
+                    "mode": "image-to-image",
+                    "model": model,
+                    "seed": seed,
+                    "strength": strength,
+                    "output_format": output_format,
+                    "image": image
+                }
+
+        elif model == "sd3":
+            if image is None:
+                files = {"none": ''}
+                data={
+                    "prompt": positive,
+                    "negative_prompt": negative,
+                    "aspect_ratio": aspect_ratio,
+                    "mode": "text-to-image",
+                    "model": model,
+                    "seed": seed,
+                    "output_format": output_format,
+                }
+            else:
+
+                files={
+                        "image": ("image.png", image, 'image/png'), 
+                    }
+
+                data = {
+                    "prompt": positive,
+                    "negative_prompt": negative,
+                    "mode": "image-to-image",
+                    "model": model,
+                    "seed": seed,
+                    "strength": strength,
+                    "output_format": output_format,
+                }
+        
+
+        response = requests.post(
+            f"https://api.stability.ai/v2beta/stable-image/generate/sd3",
+            headers={
+                "authorization": os.getenv("STABILITY_API_KEY"),
+                "accept": "image/*"
+            },
+            files=files,
+            data=data,
+        )
+
+        if response.status_code == 200:
+
+            return (response.content, )
+        else:
+            print(f"Error: {response.status_code}")
+
+
+class SDAPISaveImage:
+    def __init__(self):
+        self.output_dir = folder_paths.get_output_directory()
+
+    @classmethod
+    def INPUT_TYPES(s):
+        return {"required": {"image_content": ("IMAGE",),
+                              "filename_prefix": ("STRING", {"default": "SDAPI"})}}
+    RETURN_TYPES = ()
+    FUNCTION = "save"
+
+    OUTPUT_NODE = True
+
+    CATEGORY = "sd3"
+
+    def save(self, image_content, filename_prefix="SDAPI"):
+        full_output_folder, filename, counter, subfolder, filename_prefix = folder_paths.get_save_image_path(filename_prefix, self.output_dir)
+        file = f"{filename}_{counter:05}_.png"
+        filepath = os.path.join(full_output_folder, file)
+
+        with open(filepath, "wb") as f:
+            f.write(image_content)
+
+        results = [{"filename": file, "subfolder": subfolder, "type": "output"}]
+        return {"ui": {"images": results}}
+
+
+class SDAPIPreviewImage:
+    def __init__(self):
+        self.temp_dir = folder_paths.get_temp_directory()
+
+    @classmethod
+    def INPUT_TYPES(s):
+        return {"required": {"image_content": ("IMAGE",)}}
+    RETURN_TYPES = ()
+    FUNCTION = "preview"
+
+    OUTPUT_NODE = True
+
+    CATEGORY = "sd3"
+
+    @convert_image_format
+    def preview(self, image_content: bytes):
+        prefix = "_temp_" + ''.join(random.choice("abcdefghijklmnopqrstupvxyz") for _ in range(5))
+        full_output_folder, filename, counter, subfolder, filename_prefix = folder_paths.get_save_image_path(prefix, self.temp_dir)
+        file = f"{filename}_{counter:05}_.png"
+        filepath = os.path.join(full_output_folder, file)
+
+        with open(filepath, "wb") as f:
+            f.write(image_content)
+
+        results = [{"filename": file, "subfolder": subfolder, "type": "temp"}]
+        return {"ui": {"images": results}}
+    
+
+@convert_image_format
+def save_image_to_respective_path(prefix_append, output_dir, 
+                                      images: torch.Tensor, filename_prefix, prompt, 
+                                      extra_pnginfo, compress_level,
+                                      type, results):
+        
+        filename_prefix += prefix_append
+        full_output_folder, filename, counter, subfolder, filename_prefix = folder_paths.get_save_image_path(
+            filename_prefix, output_dir, images[0].shape[1], images[0].shape[0]
+        )
+        for batch_number, image in enumerate(images):
+            i = 255. * image.cpu().numpy()
+            img = Image.fromarray(np.clip(i, 0, 255).astype(np.uint8))
+            metadata: Optional[PngInfo] = None
+            if not args.disable_metadata:
+                metadata = PngInfo()
+                if prompt is not None:
+                    metadata.add_text("prompt", json.dumps(prompt))
+                if extra_pnginfo is not None:
+                    for x in extra_pnginfo:
+                        metadata.add_text(x, json.dumps(extra_pnginfo[x]))
+
+            
+            filename_with_batch_num = filename.replace("%batch_num%", str(batch_number))
+            file = f"{filename_with_batch_num}_{counter:05}_.png"
+            img.save(os.path.join(full_output_folder, file), pnginfo=metadata, compress_level=compress_level)
+            results.append({"filename": file, "subfolder": subfolder, "type": type})
+            counter += 1
+
+
+class SaveAndPreviewImage:
+    def __init__(self) -> None:
+        self.output_dir = folder_paths.get_output_directory()
+        self.temp_dir = folder_paths.get_temp_directory()
+        self.type = "output"
+        self.prefix_append = ""
+        self.temp_prefix_append = "_temp_" + ''.join(random.choice("abcdefghijklmnopqrstupvxyz") for _ in range(5))
+        self.compress_level = 4
+        self.temp_compress_level = 1
+
+    @classmethod
+    def INPUT_TYPES(s) -> Dict[str, Union[Tuple[str, ...], Tuple[str, Dict[str, Union[str, int]]]]]:
+        return {
+            "required": {
+                "images": ("IMAGE", ),
+                "filename_prefix": ("STRING", {"default": "ComfyUI"}),
+                # "save_images": ("BOOLEAN", {"default": False}),
+                "save_type": (["local", "s3"], {"default": "local"}),
+                "bucket_name": ("STRING", {"default": "my-bucket"}),
+            },
+            "hidden": {"prompt": "PROMPT", "extra_pnginfo": "EXTRA_PNGINFO"},
+        }
+
+    RETURN_TYPES: Tuple = ()
+    FUNCTION = "save_and_preview_images"
+
+    OUTPUT_NODE = True
+
+    CATEGORY = "image"
+
+
+    def save_and_preview_images(
+        self,
+        images: List[Union[torch.Tensor, bytes]],
+        filename_prefix: str = "ComfyUI",
+        # save_images: bool = False,
+        save_type: str = "local",
+        bucket_name: str = "my-bucket",
+        prompt = None,
+        extra_pnginfo = None,
+    ) -> Dict[str, Dict[str, List[Dict[str, Union[str, None]]]]]:
+        
+        results: List[Dict[str, Union[str, None]]] = []
+
+
+
+        save_image_to_respective_path(self.temp_prefix_append, 
+                                      self.temp_dir, images, filename_prefix, prompt, 
+                                      extra_pnginfo, self.temp_compress_level, "temp", results)
+
+        if save_type == "local":
+            save_image_to_respective_path(self.prefix_append, self.output_dir, images, 
+                                          filename_prefix, prompt, extra_pnginfo, 
+                                          self.compress_level, self.type, results=[])
+        elif save_type == "s3":
+            print("Here")
+            if isinstance(images, bytes) or isinstance(images, torch.Tensor):
+                print("Here 2")
+                file = results[0]["filename"]
+                image_url = self.upload_to_s3(images, file, bucket_name)
+                print(image_url )
+
+                results[-1]["output"] = {"image_url": image_url}
+
+        print(results)
+
+        return {"ui": {"images": results}}
+    
+    @convert_image_format
+    def upload_to_s3(self, image_data: bytes, filename, bucket_name):
+        
+        # Configure your S3 client with access keys, endpoint URL, region, and bucket name
+        session = boto3.Session(
+            aws_access_key_id=os.getenv("DO_ACCESS_KEY_ID"),
+            aws_secret_access_key=os.getenv("DO_SECRET_ACCESS_KEY"),
+            region_name=os.getenv("REGION_NAME"),
+        )
+        s3_client = session.client("s3", endpoint_url=os.getenv("DO_ENDPOINT_URL"))
+        bucket_name = os.getenv("BUCKET_NAME")
+
+        key = f"comfy-test/{filename}"
+
+        # Upload the image data
+        s3_client.put_object(Bucket=bucket_name, Key=key, Body=image_data, ACL="public-read")
+
+        # Generate and return the image URL
+        endpoint_url = s3_client.meta.endpoint_url
+        hostname = urlparse(endpoint_url).hostname
+        return f"https://{bucket_name}.{hostname}/{key}"
+
+
+
+
+
 class KSamplerAdvanced:
     @classmethod
     def INPUT_TYPES(s):
@@ -1399,6 +1806,7 @@ class SaveImage:
 
     CATEGORY = "image"
 
+    @convert_image_format
     def save_images(self, images, filename_prefix="ComfyUI", prompt=None, extra_pnginfo=None):
         filename_prefix += self.prefix_append
         full_output_folder, filename, counter, subfolder, filename_prefix = folder_paths.get_save_image_path(filename_prefix, self.output_dir, images[0].shape[1], images[0].shape[0])
@@ -1424,6 +1832,7 @@ class SaveImage:
                 "type": self.type
             })
             counter += 1
+
 
         return { "ui": { "images": results } }
 
@@ -1486,10 +1895,18 @@ class LoadImage:
     @classmethod
     def IS_CHANGED(s, image):
         image_path = folder_paths.get_annotated_filepath(image)
-        m = hashlib.sha256()
         with open(image_path, 'rb') as f:
-            m.update(f.read())
-        return m.digest().hex()
+            file_content = f.read()
+
+            # Open the image using PIL
+            image = Image.open(io.BytesIO(file_content))
+
+            # Get the pixel data
+            pixel_data = image.tobytes()
+
+            hash = blake3.blake3(pixel_data).hexdigest()
+            
+        return hash
 
     @classmethod
     def VALIDATE_INPUTS(s, image):
@@ -1535,10 +1952,18 @@ class LoadImageMask:
     @classmethod
     def IS_CHANGED(s, image, channel):
         image_path = folder_paths.get_annotated_filepath(image)
-        m = hashlib.sha256()
         with open(image_path, 'rb') as f:
-            m.update(f.read())
-        return m.digest().hex()
+            file_content = f.read()
+
+            # Open the image using PIL
+            image = Image.open(io.BytesIO(file_content))
+
+            # Get the pixel data
+            pixel_data = image.tobytes()
+
+            hash = blake3.blake3(pixel_data).hexdigest()
+
+        return hash
 
     @classmethod
     def VALIDATE_INPUTS(s, image):
@@ -1715,7 +2140,13 @@ class ImagePadForOutpaint:
         return (new_image, mask)
 
 
+
+
+
 NODE_CLASS_MAPPINGS = {
+    "SDAPISaveImage": SDAPISaveImage,
+    "SDAPIPreviewImage": SDAPIPreviewImage,
+    "SDAPI": SDAPI,
     "KSampler": KSampler,
     "CheckpointLoaderSimple": CheckpointLoaderSimple,
     "CLIPTextEncode": CLIPTextEncode,
@@ -1785,6 +2216,10 @@ NODE_CLASS_MAPPINGS = {
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
+    # Diffusion
+    "SDAPI": "Stable Diffusion API",
+    "SDAPISaveImage": "SDAPI Save Image",
+    "SDAPIPreviewImage": "SDAPI Preview Image",
     # Sampling
     "KSampler": "KSampler",
     "KSamplerAdvanced": "KSampler (Advanced)",

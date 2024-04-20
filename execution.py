@@ -5,25 +5,88 @@ import threading
 import heapq
 import traceback
 import inspect
-from typing import List, Literal, NamedTuple, Optional
+from typing import List, Literal, NamedTuple, Optional, Any, Dict, Union, Tuple
 
 import torch
 import nodes
 
 import comfy.model_management
 
-def get_input_data(inputs, class_def, unique_id, outputs={}, prompt={}, extra_data={}):
-    valid_inputs = class_def.INPUT_TYPES()
-    input_data_all = {}
-    for x in inputs:
-        input_data = inputs[x]
+from collections.abc import Iterator
+from pydantic import BaseModel
+import json
+
+
+
+class InputData(BaseModel):
+    inputs: Dict[str, Any]
+    class_def: Any
+    unique_id: str
+    outputs: Optional[Dict[str, Any]] = {}
+    prompt: Optional[Dict[str, Any]] = None
+    extra_data: Optional[Dict[str, Any]] = None
+
+
+class MapNodeOverListInput(BaseModel):
+    obj: Any
+    input_data_all: Dict[str, Union[List[Any], Tuple[None, ...]]]
+    func: str
+    allow_interrupt: Optional[bool] = False
+
+
+class GetOutputDataInput(BaseModel):
+    obj: Any
+    input_data_all: Dict[str, Union[List[Any], Tuple[None, ...]]]
+
+
+# class RecursiveExecuteInput(BaseModel):
+#     server: Any
+#     prompt: Dict[str, Dict[str, Any]]
+#     outputs: Dict[str, List[Any]]
+#     current_item: str
+#     extra_data: Dict[str, Any]
+#     executed: set
+#     prompt_id: str
+#     outputs_ui: Dict[str, Dict[str, Any]]
+#     object_storage: Dict[Tuple[str, str], Any]
+
+
+class ValidateInputsInput(BaseModel):
+    prompt: Dict[str, Dict[str, Any]]
+    item: str
+    validated: Dict[str, Tuple[bool, List[Dict[str, Union[str, Any]]], str]]
+
+
+def get_input_data(input_data_class: InputData) -> Dict[str, Union[List[Any], Tuple[None, ...]]]:
+    
+    """
+    Prepare input data for a class based on the provided inputs, outputs, prompt, and extra data.
+
+    Args:
+        input_data: A class that contains the required input data. Below are the parameters of the class:
+            inputs (Dict[str, Any]): A dictionary of input values, where the keys are input names and values are the input data.
+            class_def (Any): The class definition containing the INPUT_TYPES method.
+            unique_id (str): A unique identifier.
+            outputs (Dict[str, Any], optional): A dictionary of output values, where keys are unique IDs and values are lists of outputs.
+            prompt (Optional[Dict[str, Any]], optional): A dictionary containing prompt data.
+            extra_data (Optional[Dict[str, Any]], optional): A dictionary containing extra data.
+
+    Returns:
+        Dict[str, Union[List[Any], Tuple[None, ...]]]: A dictionary containing the prepared input data, where keys are input names and values are either lists of input data or tuples containing None.
+    """
+    
+    valid_inputs = input_data_class.class_def.INPUT_TYPES()
+    input_data_all: Dict[str, Union[List[Any], Tuple[None, ...]]] = {}
+    
+    for x in input_data_class.inputs:
+        input_data = input_data_class.inputs[x]
         if isinstance(input_data, list):
             input_unique_id = input_data[0]
             output_index = input_data[1]
-            if input_unique_id not in outputs:
+            if input_unique_id not in input_data_class.outputs:
                 input_data_all[x] = (None,)
                 continue
-            obj = outputs[input_unique_id][output_index]
+            obj = input_data_class.outputs[input_unique_id][output_index]
             input_data_all[x] = obj
         else:
             if ("required" in valid_inputs and x in valid_inputs["required"]) or ("optional" in valid_inputs and x in valid_inputs["optional"]):
@@ -33,52 +96,115 @@ def get_input_data(inputs, class_def, unique_id, outputs={}, prompt={}, extra_da
         h = valid_inputs["hidden"]
         for x in h:
             if h[x] == "PROMPT":
-                input_data_all[x] = [prompt]
+                input_data_all[x] = [input_data_class.prompt]
             if h[x] == "EXTRA_PNGINFO":
-                input_data_all[x] = [extra_data.get('extra_pnginfo', None)]
+                input_data_all[x] = [input_data_class.extra_data.get('extra_pnginfo', None)] if input_data_class.extra_data is not None else (None,)
             if h[x] == "UNIQUE_ID":
-                input_data_all[x] = [unique_id]
+                input_data_all[x] = [input_data_class.unique_id]
     return input_data_all
 
-def map_node_over_list(obj, input_data_all, func, allow_interrupt=False):
+def map_node_over_list(map_node_input_data: MapNodeOverListInput) -> List[Any]:
+
+    """
+    Apply a function to an object, handling cases where the input data is a list.
+
+    Args:
+        obj (Any): The object to apply the function to.
+        input_data_all (Dict[str, List[Any]]): A dictionary mapping input names to lists of input data.
+        func (str): The name of the function to apply to the object.
+        allow_interrupt (bool, optional): Whether to allow interruptions before executing the function. Defaults to False.
+
+    Returns:
+        List[Any]: A list of results from applying the function to the object.
+    """
+
     # check if node wants the lists
     input_is_list = False
-    if hasattr(obj, "INPUT_IS_LIST"):
-        input_is_list = obj.INPUT_IS_LIST
+    if hasattr(map_node_input_data.obj, "INPUT_IS_LIST"):
+        input_is_list = map_node_input_data.obj.INPUT_IS_LIST
 
-    if len(input_data_all) == 0:
+    if len(map_node_input_data.input_data_all) == 0:
         max_len_input = 0
     else:
-        max_len_input = max([len(x) for x in input_data_all.values()])
+        max_len_input = max([len(x) for x in map_node_input_data.input_data_all.values()])
      
     # get a slice of inputs, repeat last input when list isn't long enough
-    def slice_dict(d, i):
-        d_new = dict()
+    def slice_dict(
+            d: Dict[str, Union[List[Any], Tuple[None, ...]]], 
+            i: int
+        ) -> Dict[str, Any]:
+
+        d_new: Dict[str, Any] = dict()
         for k,v in d.items():
             d_new[k] = v[i if len(v) > i else -1]
         return d_new
     
-    results = []
+    results: List[Any] = []
+
     if input_is_list:
-        if allow_interrupt:
+        if map_node_input_data.allow_interrupt:
             nodes.before_node_execution()
-        results.append(getattr(obj, func)(**input_data_all))
+        result = getattr(map_node_input_data.obj, map_node_input_data.func)(**map_node_input_data.input_data_all)
+        if isinstance(result, Iterator):
+            print("iterator found 1")
+            results.extend(list(result))
+        else:
+            results.append(result)
     elif max_len_input == 0:
-        if allow_interrupt:
+        if map_node_input_data.allow_interrupt:
             nodes.before_node_execution()
-        results.append(getattr(obj, func)())
+        result = getattr(map_node_input_data.obj, map_node_input_data.func)()
+        if isinstance(result, Iterator):
+            print("iterator found 2")
+            results.extend(list(result))
+        else:
+            results.append(result)
     else:
+        # print("Inputs")
+        # print(map_node_input_data.input_data_all)
+        # print(max_len_input)
+        
         for i in range(max_len_input):
-            if allow_interrupt:
+            if map_node_input_data.allow_interrupt:
                 nodes.before_node_execution()
-            results.append(getattr(obj, func)(**slice_dict(input_data_all, i)))
+            result = getattr(map_node_input_data.obj, map_node_input_data.func)(**slice_dict(map_node_input_data.input_data_all, i))
+            if isinstance(result, Iterator):
+                print("iterator found 3")
+                # print("Result is iterator")
+                results.extend(list(result))
+            else:
+                # print("Result is not iterator")
+                results.append(result)
+
     return results
 
-def get_output_data(obj, input_data_all):
+def get_output_data(get_output_data_input: GetOutputDataInput) -> Tuple[List[List[Any]], Dict[str, List[Any]]]:
+
+    """
+    Get the output data from an object based on the input data.
+
+    Args:
+        obj (Any): The object to get the output data from.
+        input_data_all (Dict[str, List[Any]]): A dictionary mapping input names to lists of input data.
+
+    Returns:
+        Tuple[List[List[Any]], Dict[str, List[Any]]]:
+            A tuple containing:
+                - A list of lists, where each inner list represents the output results for a single input.
+                - A dictionary mapping UI component names to lists of UI data.
+    """
     
-    results = []
-    uis = []
-    return_values = map_node_over_list(obj, input_data_all, obj.FUNCTION, allow_interrupt=True)
+    results: List[Any] = []
+    uis: List[Dict[str, Any]] = []
+    return_values = map_node_over_list(MapNodeOverListInput(obj=get_output_data_input.obj, 
+                                                            input_data_all=get_output_data_input.input_data_all, 
+                                                            func=get_output_data_input.obj.FUNCTION, 
+                                                            allow_interrupt=True))
+
+    print(f"return_values: {return_values}")
+    
+    # breakpoint()
+
 
     for r in return_values:
         if isinstance(r, dict):
@@ -89,12 +215,12 @@ def get_output_data(obj, input_data_all):
         else:
             results.append(r)
     
-    output = []
+    output: List[Any] = []
     if len(results) > 0:
         # check which outputs need concatenating
         output_is_list = [False] * len(results[0])
-        if hasattr(obj, "OUTPUT_IS_LIST"):
-            output_is_list = obj.OUTPUT_IS_LIST
+        if hasattr(get_output_data_input.obj, "OUTPUT_IS_LIST"):
+            output_is_list = get_output_data_input.obj.OUTPUT_IS_LIST
 
         # merge node execution results
         for i, is_list in zip(range(len(results[0])), output_is_list):
@@ -103,12 +229,29 @@ def get_output_data(obj, input_data_all):
             else:
                 output.append([o[i] for o in results])
 
-    ui = dict()    
+    ui: Dict[str, List[Any]] = dict()
+
     if len(uis) > 0:
         ui = {k: [y for x in uis for y in x[k]] for k in uis[0].keys()}
+
+
     return output, ui
 
-def format_value(x):
+def format_value(x: Any) -> Union[int, float, bool, str, None]:
+    """
+    Format a value for display or storage. (probably)
+    Convert a value to a string representation if it is not None or already a basic data type. (more generic explanation)
+
+    Args:
+        x (Any): The value to be formatted.
+
+    Returns:
+        Union[None, int, float, bool, str]:
+            - If the input value is None, returns None.
+            - If the input value is an int, float, bool, or str, returns the value as-is.
+            - If the input value is of any other type, returns its string representation.
+    """
+
     if x is None:
         return None
     elif isinstance(x, (int, float, bool, str)):
@@ -116,13 +259,48 @@ def format_value(x):
     else:
         return str(x)
 
-def recursive_execute(server, prompt, outputs, current_item, extra_data, executed, prompt_id, outputs_ui, object_storage):
+
+def recursive_execute(
+        server: Any, 
+        prompt: Dict[str, Dict[str, Any]], 
+        outputs: Dict[str, List[Any]],
+        current_item: str, 
+        extra_data: Dict[str, Any],
+        executed: set, 
+        prompt_id: str, 
+        outputs_ui: Dict[str, Dict[str, Any]],
+        object_storage: Dict[Tuple[str, str], Any]
+    ) -> Tuple[bool, Optional[Dict[str, Any]], Optional[Exception]]:
+
+    """
+    Recursively execute a node in the prompt based on its input dependencies.
+
+    Args:
+        server (Any): An object representing the server.
+        prompt (Dict[str, Dict[str, Any]]): A dictionary containing node information and inputs.
+        outputs (Dict[str, List[Any]]): A dictionary containing output data for executed nodes.
+        current_item (str): The unique ID of the current node to be executed.
+        extra_data (Dict[str, Any]): A dictionary containing extra data.
+        executed (set): A set of unique IDs of executed nodes.
+        prompt_id (str): The ID of the prompt.
+        outputs_ui (Dict[str, Dict[str, Any]]): A dictionary containing UI output data for executed nodes.
+        object_storage (Dict[Tuple[str, str], Any]): A dictionary for storing instantiated objects.
+
+    Returns:
+        Tuple[bool, Optional[Dict[str, Any]], Optional[Exception]]:
+            - A boolean indicating if the execution was successful.
+            - A dictionary containing error details if an error occurred, otherwise None.
+            - The exception object if an exception occurred, otherwise None.
+    """
+
     unique_id = current_item
     inputs = prompt[unique_id]['inputs']
     class_type = prompt[unique_id]['class_type']
     class_def = nodes.NODE_CLASS_MAPPINGS[class_type]
     if unique_id in outputs:
         return (True, None, None)
+    
+    # breakpoint()
 
     for x in inputs:
         input_data = inputs[x]
@@ -132,13 +310,14 @@ def recursive_execute(server, prompt, outputs, current_item, extra_data, execute
             output_index = input_data[1]
             if input_unique_id not in outputs:
                 result = recursive_execute(server, prompt, outputs, input_unique_id, extra_data, executed, prompt_id, outputs_ui, object_storage)
+                
                 if result[0] is not True:
                     # Another node failed further upstream
                     return result
 
-    input_data_all = None
+    input_data_all: Dict[str, Union[List[Any], Tuple[None, ...]]] = {}
     try:
-        input_data_all = get_input_data(inputs, class_def, unique_id, outputs, prompt, extra_data)
+        input_data_all = get_input_data(InputData(inputs=inputs, class_def=class_def, unique_id=unique_id, outputs=outputs, prompt=prompt, extra_data=extra_data))
         if server.client_id is not None:
             server.last_node_id = unique_id
             server.send_sync("executing", { "node": unique_id, "prompt_id": prompt_id }, server.client_id)
@@ -148,8 +327,23 @@ def recursive_execute(server, prompt, outputs, current_item, extra_data, execute
             obj = class_def()
             object_storage[(unique_id, class_type)] = obj
 
-        output_data, output_ui = get_output_data(obj, input_data_all)
+        output_data, output_ui = get_output_data(GetOutputDataInput(obj=obj, input_data_all=input_data_all))
         outputs[unique_id] = output_data
+        print(output_data)
+
+        # Check for "outputs" key at the top level of the prompt
+        # print(outputs)
+        if "outputs" in prompt:
+            print("Got here First")
+            for output_key, output_source in prompt["outputs"].items():
+                if output_source[0] == unique_id:  # Ensure the output source matches the current node
+                    print('I am here')
+                    
+                    output_index = output_source[1]
+                    output_value = output_data[output_index]
+                    server.output_map.set(output_key, json.dumps(output_value))
+                    server.broadcast_yjs_updates()
+
         if len(output_ui) > 0:
             outputs_ui[unique_id] = output_ui
             if server.client_id is not None:
@@ -158,7 +352,7 @@ def recursive_execute(server, prompt, outputs, current_item, extra_data, execute
         logging.info("Processing interrupted")
 
         # skip formatting inputs/outputs
-        error_details = {
+        error_details: Dict[str, Union[str, List[str], Dict[str, List[Union[int, float, str, None]]], Dict[str, List[List[Union[int, float, str, None]]]]]] = {
             "node_id": unique_id,
         }
 
@@ -166,13 +360,13 @@ def recursive_execute(server, prompt, outputs, current_item, extra_data, execute
     except Exception as ex:
         typ, _, tb = sys.exc_info()
         exception_type = full_type_name(typ)
-        input_data_formatted = {}
+        input_data_formatted: Dict[str, List[Union[int, float, str, None]]] = {}
         if input_data_all is not None:
             input_data_formatted = {}
             for name, inputs in input_data_all.items():
                 input_data_formatted[name] = [format_value(x) for x in inputs]
 
-        output_data_formatted = {}
+        output_data_formatted: Dict[str, List[List[Union[int, float, str, None]]]] = {}
         for node_id, node_outputs in outputs.items():
             output_data_formatted[node_id] = [[format_value(x) for x in l] for l in node_outputs]
 
@@ -194,6 +388,7 @@ def recursive_execute(server, prompt, outputs, current_item, extra_data, execute
     return (True, None, None)
 
 def recursive_will_execute(prompt, outputs, current_item, memo={}):
+    # breakpoint()
     unique_id = current_item
 
     if unique_id in memo:
@@ -215,6 +410,7 @@ def recursive_will_execute(prompt, outputs, current_item, memo={}):
     memo[unique_id] = will_execute + [unique_id]
     return memo[unique_id]
 
+
 def recursive_output_delete_if_changed(prompt, old_prompt, outputs, current_item):
     unique_id = current_item
     inputs = prompt[unique_id]['inputs']
@@ -228,11 +424,11 @@ def recursive_output_delete_if_changed(prompt, old_prompt, outputs, current_item
         if unique_id in old_prompt and 'is_changed' in old_prompt[unique_id]:
             is_changed_old = old_prompt[unique_id]['is_changed']
         if 'is_changed' not in prompt[unique_id]:
-            input_data_all = get_input_data(inputs, class_def, unique_id, outputs)
+            input_data_all = get_input_data(InputData(inputs=inputs, class_def=class_def, unique_id=unique_id, outputs=outputs))
             if input_data_all is not None:
                 try:
                     #is_changed = class_def.IS_CHANGED(**input_data_all)
-                    is_changed = map_node_over_list(class_def, input_data_all, "IS_CHANGED")
+                    is_changed = map_node_over_list(MapNodeOverListInput(obj=class_def, input_data_all=input_data_all, func="IS_CHANGED"))
                     prompt[unique_id]['is_changed'] = is_changed
                 except:
                     to_delete = True
@@ -274,12 +470,12 @@ class PromptExecutor:
         self.reset()
 
     def reset(self):
-        self.outputs = {}
-        self.object_storage = {}
-        self.outputs_ui = {}
-        self.status_messages = []
-        self.success = True
-        self.old_prompt = {}
+        self.outputs: dict = {}
+        self.object_storage: dict = {}
+        self.outputs_ui: dict = {}
+        self.status_messages: list = []
+        self.success: bool = True
+        self.old_prompt: dict = {}
 
     def add_message(self, event, data, broadcast: bool):
         self.status_messages.append((event, data))
@@ -360,7 +556,10 @@ class PromptExecutor:
                 del d
 
             for x in prompt:
-                recursive_output_delete_if_changed(prompt, self.old_prompt, self.outputs, x)
+                if x == "outputs":
+                    continue
+                else:
+                    recursive_output_delete_if_changed(prompt, self.old_prompt, self.outputs, x)
 
             current_outputs = set(self.outputs.keys())
             for x in list(self.outputs_ui.keys()):
@@ -401,10 +600,15 @@ class PromptExecutor:
 
 
 
-def validate_inputs(prompt, item, validated):
+def validate_inputs(validate_inputs_input: ValidateInputsInput):
+    prompt = validate_inputs_input.prompt
+    item = validate_inputs_input.item
+    validated = validate_inputs_input.validated
+
     unique_id = item
     if unique_id in validated:
         return validated[unique_id]
+    
 
     inputs = prompt[unique_id]['inputs']
     class_type = prompt[unique_id]['class_type']
@@ -471,7 +675,7 @@ def validate_inputs(prompt, item, validated):
                 errors.append(error)
                 continue
             try:
-                r = validate_inputs(prompt, o_id, validated)
+                r = validate_inputs(ValidateInputsInput(prompt=prompt, item=o_id, validated=validated))
                 if r[0] is False:
                     # `r` will be set in `validated[o_id]` already
                     valid = False
@@ -577,14 +781,14 @@ def validate_inputs(prompt, item, validated):
                         continue
 
     if len(validate_function_inputs) > 0:
-        input_data_all = get_input_data(inputs, obj_class, unique_id)
+        input_data_all = get_input_data(InputData(inputs=inputs, class_def=obj_class, unique_id=unique_id))
         input_filtered = {}
         for x in input_data_all:
             if x in validate_function_inputs:
                 input_filtered[x] = input_data_all[x]
 
         #ret = obj_class.VALIDATE_INPUTS(**input_filtered)
-        ret = map_node_over_list(obj_class, input_filtered, "VALIDATE_INPUTS")
+        ret = map_node_over_list(MapNodeOverListInput(obj=obj_class, input_data_all=input_filtered, func="VALIDATE_INPUTS"))
         for x in input_filtered:
             for i, r in enumerate(ret):
                 if r is not True:
@@ -620,11 +824,16 @@ def full_type_name(klass):
     return module + '.' + klass.__qualname__
 
 def validate_prompt(prompt):
+    # print(f"From validate_prompts: {prompt}")
     outputs = set()
+
     for x in prompt:
-        class_ = nodes.NODE_CLASS_MAPPINGS[prompt[x]['class_type']]
-        if hasattr(class_, 'OUTPUT_NODE') and class_.OUTPUT_NODE == True:
-            outputs.add(x)
+        if x == "outputs":
+            continue
+        else:
+            class_ = nodes.NODE_CLASS_MAPPINGS[prompt[x]['class_type']]
+            if hasattr(class_, 'OUTPUT_NODE') and class_.OUTPUT_NODE == True:
+                outputs.add(x)
 
     if len(outputs) == 0:
         error = {
@@ -643,7 +852,7 @@ def validate_prompt(prompt):
         valid = False
         reasons = []
         try:
-            m = validate_inputs(prompt, o, validated)
+            m = validate_inputs(ValidateInputsInput(prompt=prompt, item=o, validated=validated))
             valid = m[0]
             reasons = m[1]
         except Exception as ex:

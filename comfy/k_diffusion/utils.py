@@ -1,5 +1,6 @@
 from contextlib import contextmanager
-import hashlib
+# import hashlib
+import blake3
 import math
 from pathlib import Path
 import shutil
@@ -42,7 +43,7 @@ def download_file(path, url, digest=None):
         with urllib.request.urlopen(url) as response, open(path, 'wb') as f:
             shutil.copyfileobj(response, f)
     if digest is not None:
-        file_digest = hashlib.sha256(open(path, 'rb').read()).hexdigest()
+        file_digest = blake3.blake3(open(path, 'rb').read()).hexdigest()
         if digest != file_digest:
             raise OSError(f'hash of {path} (url: {url}) failed to validate')
     return path

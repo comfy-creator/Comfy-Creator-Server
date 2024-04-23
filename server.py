@@ -1,11 +1,7 @@
-from __future__ import annotations
-
 import os
 import sys
 import asyncio
 import traceback
-
-import aiohttp.abc
 
 import nodes
 import folder_paths
@@ -20,7 +16,6 @@ from PIL.PngImagePlugin import PngInfo
 from io import BytesIO
 
 import aiohttp
-import aiohttp_cors
 from aiohttp import web
 import logging
 
@@ -28,76 +23,29 @@ import mimetypes
 from comfy.cli_args import args
 import comfy.utils
 import comfy.model_management
-from custom_types import QueueJobRequest, WorkflowStep, SerializedGraph
 
 from app.user_manager import UserManager
-from static_file_server import serve_react_app
-from typing import List, Dict, IO, Callable, Awaitable, Any
-from pathlib import Path
-import y_py as Y
-
-
 
 class BinaryEventTypes:
     PREVIEW_IMAGE = 1
     UNENCODED_PREVIEW_IMAGE = 2
 
-async def send_socket_catch_exception(function: Callable, message: dict) -> None:
-    """
-    Sends a message via the provided function and catches potential exceptions.
-
-    Args:
-        function: The function to call for sending the message.
-        message: The message dictionary to send.
-    """
-
+async def send_socket_catch_exception(function, message):
     try:
         await function(message)
     except (aiohttp.ClientError, aiohttp.ClientPayloadError, ConnectionResetError) as err:
         logging.warning("send error: {}".format(err))
 
 @web.middleware
-async def cache_control(request: web.Request, handler: Callable[[web.Request], Awaitable[web.Response]]) -> web.Response:
-    """
-    Middleware that sets cache control headers for specific file extensions.
-
-    Args:
-        request: The incoming web request.
-        handler: The next handler in the chain.
-
-    Returns:
-        The web response with cache control headers set if applicable.
-    """
-
+async def cache_control(request: web.Request, handler):
     response: web.Response = await handler(request)
     if request.path.endswith('.js') or request.path.endswith('.css'):
         response.headers.setdefault('Cache-Control', 'no-cache')
     return response
 
 def create_cors_middleware(allowed_origin: str):
-    """
-    Creates a middleware function that adds CORS headers for the specified origin.
-
-    Args:
-        allowed_origin: The allowed origin for CORS requests.
-
-    Returns:
-        A middleware function that adds CORS headers.
-    """
-
     @web.middleware
-    async def cors_middleware(request: web.Request, handler: Callable[[web.Request], Awaitable[web.Response]]) -> web.Response:
-        """
-        Middleware function that adds CORS headers to the response.
-
-        Args:
-            request: The incoming web request.
-            handler: The next handler in the chain.
-
-        Returns:
-            The web response with CORS headers added.
-        """
-
+    async def cors_middleware(request: web.Request, handler):
         if request.method == "OPTIONS":
             # Pre-flight request. Reply successfully:
             response = web.Response()
@@ -113,22 +61,7 @@ def create_cors_middleware(allowed_origin: str):
     return cors_middleware
 
 class PromptServer():
-    """
-    This class manages the Prompt Server, handling websockets, user management, and message queues.
-
-    It initializes the web application, sets up CORS headers, manages socket connections, and processes messages from clients.
-    """
-
-    instance = None
-
-    def __init__(self, loop: asyncio.AbstractEventLoop) -> None:
-        """
-        Initializes the PromptServer instance.
-
-        Args:
-            loop: The asyncio event loop to use.
-        """
-
+    def __init__(self, loop):
         PromptServer.instance = self
 
         mimetypes.init()
@@ -138,11 +71,8 @@ class PromptServer():
         self.supports = ["custom_nodes_from_web"]
         self.prompt_queue = None
         self.loop = loop
-        self.messages: asyncio.Queue = asyncio.Queue()
+        self.messages = asyncio.Queue()
         self.number = 0
-
-        self.ydoc = Y.YDoc()
-        self.output_map = self.ydoc.get_map("workflows")
 
         middlewares = [cache_control]
         if args.enable_cors_header:
@@ -150,27 +80,18 @@ class PromptServer():
 
         max_upload_size = round(args.max_upload_size * 1024 * 1024)
         self.app = web.Application(client_max_size=max_upload_size, middlewares=middlewares)
-        self.cors = aiohttp_cors.setup(self.app, defaults={
-            "*": aiohttp_cors.ResourceOptions(
-                allow_credentials=True,
-                expose_headers="*",
-                allow_headers="*",
-            )
-        })
-        self.sockets: Dict[Any, Any] = dict()
+        self.sockets = dict()
         self.web_root = os.path.join(os.path.dirname(
-            os.path.realpath(__file__)), "web/dist")
+            os.path.realpath(__file__)), "web")
         routes = web.RouteTableDef()
         self.routes = routes
         self.last_node_id = None
         self.client_id = None
 
-        self.on_prompt_handlers: List = []
+        self.on_prompt_handlers = []
 
         @routes.get('/ws')
-        async def websocket_handler(request: web.Request) -> web.WebSocketResponse:
-            """Handles websocket connections and manages client state."""
-
+        async def websocket_handler(request):
             ws = web.WebSocketResponse()
             await ws.prepare(request)
             sid = request.rel_url.query.get('clientId', '')
@@ -197,23 +118,16 @@ class PromptServer():
             return ws
 
         @routes.get("/")
-        async def get_root(request: web.Request) -> web.FileResponse:
-            """Serves the main index.html file."""
-
+        async def get_root(request):
             return web.FileResponse(os.path.join(self.web_root, "index.html"))
 
         @routes.get("/embeddings")
         def get_embeddings(self):
-            """Returns a list of available embedding filenames."""
-
             embeddings = folder_paths.get_filename_list("embeddings")
             return web.json_response(list(map(lambda a: os.path.splitext(a)[0], embeddings)))
-        
-        # Returns relative paths where extensions (as static files) can be loaded from
-        @routes.get("/extensions")
-        async def get_extensions(request: web.Request) -> web.Response:
-            """Returns a list of all extension files."""
 
+        @routes.get("/extensions")
+        async def get_extensions(request):
             files = glob.glob(os.path.join(
                 glob.escape(self.web_root), 'extensions/**/*.js'), recursive=True)
             
@@ -226,18 +140,7 @@ class PromptServer():
 
             return web.json_response(extensions)
 
-        def get_dir_by_type(dir_type: str | None) -> tuple[str, str]:
-            """
-            Gets the appropriate directory path based on the provided type.
-
-            Args:
-                dir_type (str | None): The type of directory to retrieve. Can be "input", "temp", or "output".
-                    If None is provided, defaults to "input".
-
-            Returns:
-                tuple[str, str]: A tuple containing the directory path and the provided type.
-            """
-
+        def get_dir_by_type(dir_type):
             if dir_type is None:
                 dir_type = "input"
 
@@ -250,27 +153,7 @@ class PromptServer():
 
             return type_dir, dir_type
 
-        def image_upload(post, image_save_function: Callable | None = None) -> web.Response:
-            """
-            Handles image uploads, saving the image and returning information about it.
-
-            Args:
-                post: Contains the image data.
-                    Expected keys:
-                        - image (aiohttp.MultipartFormData.ContentDisposition): The image file object.
-                        - overwrite (str): A string indicating whether to overwrite existing files ("true" or "1").
-                        - type (str): The type of upload (e.g., "input", "output").
-                image_save_function (callable, optional): A custom function to handle image saving logic.
-                    If not provided, the image will be saved to the file system.
-
-            Returns:
-                web.Response: A JSON response containing information about the uploaded image.
-                    Includes:
-                        - name (str): The filename of the uploaded image.
-                        - subfolder (str): The subfolder where the image is saved (if provided).
-                        - type (str): The type of upload provided in the request.
-            """
-
+        def image_upload(post, image_save_function=None):
             image = post.get("image")
             overwrite = post.get("overwrite")
 
@@ -314,51 +197,16 @@ class PromptServer():
                 return web.Response(status=400)
 
         @routes.post("/upload/image")
-        async def upload_image(request: web.Request) -> web.Response:
-            """
-            Handles image upload requests.
-
-            Expects the request body to be a multipart form containing the image data.
-            Forwards the data to the `image_upload` function for processing.
-
-            Args:
-                request (web.Request): The incoming web request object.
-
-            Returns:
-                web.Response: The response object containing the upload result.
-            """
-
+        async def upload_image(request):
             post = await request.post()
             return image_upload(post)
 
 
         @routes.post("/upload/mask")
-        async def upload_mask(request: web.Request) -> web.Response:
-            """
-            Handles mask image upload requests.
-
-            Receives a multipart form containing a mask image and information about the
-            original image to combine with. Validates the request data and saves the
-            masked image using the provided information.
-
-            Args:
-                request (web.Request): The incoming web request.
-
-            Returns:
-                web.Response: The response object containing the upload result.
-            """
-
+        async def upload_mask(request):
             post = await request.post()
 
-            def image_save_function(image, post, filepath: str):
-                """Handles saving the masked image based on the provided data.
-
-                Args:
-                    image: The mask image object.
-                    post: The request data.
-                    filepath: The filepath where the masked image should be saved.
-                """
-
+            def image_save_function(image, post, filepath):
                 original_ref = json.loads(post.get("original_ref"))
                 filename, output_dir = folder_paths.annotated_filepath(original_ref['filename'])
 
@@ -485,38 +333,6 @@ class PromptServer():
 
             return web.Response(status=404)
 
-
-        @routes.get("/view_all")
-        async def view_all_images(request):
-            output_dir = folder_paths.get_directory_by_type("output")
-
-            # Check if output directory exists
-            if not os.path.isdir(output_dir):
-                return web.Response(status=404)
-
-            # Get page number and size from query parameters
-            page = int(request.rel_url.query.get("page", "1"))
-            page_size = int(request.rel_url.query.get("page_size", "10"))
-
-            # Get all image files in the output directory
-            files = [str(file) for file in Path(output_dir).rglob("*") if file.is_file() and file.suffix in ['.png', '.jpg', '.jpeg', '.webp']]
-
-            # Paginate files
-            start = (page - 1) * page_size
-            end = start + page_size
-            files_page = files[start:end]
-
-            # Create response data
-            data = {
-                "page": page,
-                "page_size": page_size,
-                "total_pages": len(files) // page_size + (1 if len(files) % page_size > 0 else 0),
-                "files": files_page
-            }
-
-            return web.json_response(data)
-
-
         @routes.get("/view_metadata/{folder_name}")
         async def view_metadata(request):
             folder_name = request.match_info.get("folder_name", None)
@@ -574,6 +390,7 @@ class PromptServer():
             obj_class = nodes.NODE_CLASS_MAPPINGS[node_class]
             info = {}
             info['input'] = obj_class.INPUT_TYPES()
+            info['input_order'] = {key: list(value.keys()) for (key, value) in obj_class.INPUT_TYPES().items()}
             info['output'] = obj_class.RETURN_TYPES
             info['output_is_list'] = obj_class.OUTPUT_IS_LIST if hasattr(obj_class, 'OUTPUT_IS_LIST') else [False] * len(obj_class.RETURN_TYPES)
             info['output_name'] = obj_class.RETURN_NAMES if hasattr(obj_class, 'RETURN_NAMES') else info['output']
@@ -634,7 +451,7 @@ class PromptServer():
             logging.info("got prompt")
             resp_code = 200
             out_string = ""
-            json_data: QueueJobRequest =  await request.json()
+            json_data =  await request.json()
             json_data = self.trigger_on_prompt(json_data)
 
             if "number" in json_data:
@@ -650,7 +467,6 @@ class PromptServer():
             if "prompt" in json_data:
                 prompt = json_data["prompt"]
                 valid = execution.validate_prompt(prompt)
-                # breakpoint()
                 extra_data = {}
                 if "extra_data" in json_data:
                     extra_data = json_data["extra_data"]
@@ -662,7 +478,6 @@ class PromptServer():
                     outputs_to_execute = valid[2]
                     self.prompt_queue.put((number, prompt_id, prompt, extra_data, outputs_to_execute))
                     response = {"prompt_id": prompt_id, "number": number, "node_errors": valid[3]}
-                    print(response)
                     return web.json_response(response)
                 else:
                     logging.warning("invalid prompt: {}".format(valid[1]))
@@ -712,34 +527,19 @@ class PromptServer():
                     self.prompt_queue.delete_history_item(id_to_delete)
 
             return web.Response(status=200)
-
-    def setup_cors(self):
-        for route in list(self.app.router.routes()):
-            self.cors.add(route)
-
+        
     def add_routes(self):
         self.user_manager.add_routes(self.routes)
         self.app.add_routes(self.routes)
-        
-        # TO DO: we may change the way we serve the extensions
+
         for name, dir in nodes.EXTENSION_WEB_DIRS.items():
             self.app.add_routes([
                 web.static('/extensions/' + urllib.parse.quote(name), dir),
             ])
-        
-        # TO DO: bring back later
-        serve_react_app(self.app, self.web_root, f"http://localhost:{args.port}", 'ws')
+
         self.app.add_routes([
-            web.static('/', self.web_root, follow_symlinks=True),
+            web.static('/', self.web_root),
         ])
-
-        # self.app.add_routes([
-        #     web.static('/', self.web_root),
-        # ])
-
-        # Setup CORS on all routs
-        self.setup_cors()
-
 
     def get_queue_info(self):
         prompt_info = {}
@@ -821,20 +621,14 @@ class PromptServer():
             msg = await self.messages.get()
             await self.send(*msg)
 
-    def broadcast_yjs_updates(self):
-        """Encodes and sends Yjs updates to connected clients."""
-        update = self.ydoc.encode_state_as_update() 
-        update_data = bytes(update) 
-        # Send update_data to clients through websockets (implementation depends on your websocket framework)
-        # Example using websockets library:
-        for ws in self.sockets.values():
-            asyncio.create_task(ws.send(json.dumps({"type": "yjs_update", "data": update_data})))
-
     async def start(self, address, port, verbose=True, call_on_start=None):
         runner = web.AppRunner(self.app, access_log=None)
         await runner.setup()
         site = web.TCPSite(runner, address, port)
         await site.start()
+
+        self.address = address
+        self.port = port
 
         if verbose:
             logging.info("Starting server\n")

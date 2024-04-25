@@ -82,7 +82,7 @@ class PromptServer():
         self.app = web.Application(client_max_size=max_upload_size, middlewares=middlewares)
         self.sockets = dict()
         self.web_root = os.path.join(os.path.dirname(
-            os.path.realpath(__file__)), "web")
+            os.path.realpath(__file__)), "web/dist")
         routes = web.RouteTableDef()
         self.routes = routes
         self.last_node_id = None

@@ -10,6 +10,7 @@ tqdm
 psutil
 kornia>=0.7.1
 blake3
+firebase_admin
 
 # Requirements for comfy_ts/start.sh to run on startup
 jupyterlab

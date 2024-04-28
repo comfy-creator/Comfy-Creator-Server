@@ -7,7 +7,8 @@ AUTOGEN_PATH = sys.path.append(os.path.join(os.path.dirname(os.path.realpath(__f
 if AUTOGEN_PATH not in sys.path:
     sys.path.append(AUTOGEN_PATH)
 
-from autogen_python.comfy_request.v1_pb2 import ComfyRequest, JobSnapshot, WorkflowStep
+from autogen_python.workflow.v1_pb2 import WorkflowStep, Workflow
+from autogen_python.comfy_request.v1_pb2 import ComfyRequest, JobSnapshot
 from autogen_python.serialized_graph.v1_pb2 import SerializedGraph
 
 class ExtraPNGInfo(TypedDict):

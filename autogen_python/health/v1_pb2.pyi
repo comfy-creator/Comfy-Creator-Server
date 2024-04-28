@@ -4,6 +4,7 @@ isort:skip_file
 The canonical version of this proto can be found at
 https://github.com/grpc/grpc-proto/blob/master/grpc/health/v1/health.proto
 """
+
 import builtins
 import google.protobuf.descriptor
 import google.protobuf.internal.enum_type_wrapper
@@ -18,7 +19,7 @@ else:
 
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
-@typing_extensions.final
+@typing.final
 class HealthCheckRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -29,11 +30,11 @@ class HealthCheckRequest(google.protobuf.message.Message):
         *,
         service: builtins.str = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["service", b"service"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["service", b"service"]) -> None: ...
 
 global___HealthCheckRequest = HealthCheckRequest
 
-@typing_extensions.final
+@typing.final
 class HealthCheckResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -63,6 +64,6 @@ class HealthCheckResponse(google.protobuf.message.Message):
         *,
         status: global___HealthCheckResponse.ServingStatus.ValueType = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["status", b"status"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["status", b"status"]) -> None: ...
 
 global___HealthCheckResponse = HealthCheckResponse

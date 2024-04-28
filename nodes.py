@@ -40,16 +40,70 @@ import folder_paths
 import latent_preview
 import node_helpers
 
-from typing import Dict, List, Optional, Tuple, Union, Any, BinaryIO
+from typing import Dict, List, Optional, Tuple, Union, Any, BinaryIO, Protocol, TypedDict
 import requests
 from dotenv import load_dotenv
 import boto3
 from helper_decorators import convert_image_format
 from urllib.parse import urlparse
 
+from abc import ABC, abstractmethod
+
+
 
 load_dotenv()
 
+class InputSpec(TypedDict):
+    display_name: str
+    edge_type: str
+    spec: Dict[str, any]
+    required: bool
+    
+class OutputSpec(TypedDict):
+    display_name: str
+    edge_type: str
+
+class NodeInterface(Protocol):
+    """
+    Protocol defining the interface for all node types.
+    All nodes should conform to this protocol.
+    """
+    
+    @classmethod
+    def INPUT_TYPES(cls) -> Union[Dict[str, Dict[str, Union[Tuple[str], Tuple[str, Dict]]]], TypedDict[str, InputSpec]]:
+        """
+        Class method that should return a dictionary specifying the input types for the node.
+        """
+        ...
+        
+    @property
+    def RETURN_TYPES(self) -> Union[Tuple[str, ...], TypedDict[str, OutputSpec]]:
+        """
+        Specifies the return type (output) of the node. Legacy ComfyUI uses a tuple of strings, while modern
+        Comfy Creator uses a dict, so that return-types can be specified by name rather than position.
+        """
+        
+    @classmethod
+    def FUNCTION(cls) -> str:
+        """
+        Class method that should return the function name associated with the node.
+        """
+        ...
+        
+    @property
+    def CATEGORY(self) -> str:
+        """
+        Category of the node displayed in the graph editor, such as 'advanced/conditioning'.
+        Used by the graph-editor to categorize nodes.
+        """
+        ...
+        
+    @property
+    def DESCRIPTION(self) -> Optional[str]:
+        """
+        An optional property that should return the description of the node, if available.
+        """
+        return None
 
 
 def before_node_execution():
@@ -60,7 +114,8 @@ def interrupt_processing(value=True):
 
 MAX_RESOLUTION=16384
 
-class CLIPTextEncode:
+
+class CLIPTextEncode(NodeInterface):
     @classmethod
     def INPUT_TYPES(s) -> Dict[str, Dict[str, Union[Tuple[str], Tuple[str, Dict]]]]:
         """
@@ -92,7 +147,7 @@ class CLIPTextEncode:
         cond, pooled = clip.encode_from_tokens(tokens, return_pooled=True)
         return ([[cond, {"pooled_output": pooled}]], )
 
-class ConditioningCombine:
+class ConditioningCombine(NodeInterface):
     """
     This class combines two conditioning representations using element-wise addition.
 
@@ -350,7 +405,7 @@ class ConditioningZeroOut:
             c.append(n)
         return (c, )
 
-class ConditioningSetTimestepRange:
+class ConditioningSetTimestepRange(NodeInterface):
     @classmethod
     def INPUT_TYPES(s):
         return {"required": {"conditioning": ("CONDITIONING", ),
@@ -2141,9 +2196,7 @@ class ImagePadForOutpaint:
 
 
 
-
-
-NODE_CLASS_MAPPINGS = {
+NODE_CLASS_MAPPINGS: Dict[str, NodeInterface] = {
     "SDAPISaveImage": SDAPISaveImage,
     "SDAPIPreviewImage": SDAPIPreviewImage,
     "SDAPI": SDAPI,

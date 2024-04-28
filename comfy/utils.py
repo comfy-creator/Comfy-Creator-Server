@@ -12,6 +12,8 @@ def load_torch_file(ckpt, safe_load=False, device=None):
         device = torch.device("cpu")
     if ckpt.lower().endswith(".safetensors"):
         sd = safetensors.torch.load_file(ckpt, device=device.type)
+        print("State-dict keys:", list(sd.keys()))
+        print("Number of parameters:", sum(p.numel() for p in sd.values() if hasattr(p, 'numel')))
     else:
         if safe_load:
             if not 'weights_only' in torch.load.__code__.co_varnames:

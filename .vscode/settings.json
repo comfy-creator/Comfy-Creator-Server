@@ -1,6 +1,13 @@
 {
   "[python]": {
-    "editor.formatOnSave": true
+    "editor.formatOnSave": true,
+    "linting.enabled": true,
+    "linting.mypyEnabled": true,
+    "linting.mypyArgs": [
+        "--ignore-missing-imports",
+        "--follow-imports=silent",
+        "--show-column-numbers"
+    ]
   },
   "[typescript]": {
     "editor.defaultFormatter": "esbenp.prettier-vscode",

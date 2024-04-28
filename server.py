@@ -36,6 +36,8 @@ from typing import List, Dict, IO, Callable, Awaitable, Any
 from pathlib import Path
 import y_py as Y
 
+from autogen_python.node_defs.v1_pb2 import NodeDefinition
+
 
 
 class BinaryEventTypes:
@@ -570,6 +572,35 @@ class PromptServer():
         @routes.get("/prompt")
         async def get_prompt(request):
             return web.json_response(self.get_queue_info())
+
+        def node_info(class_type: str) -> NodeDefinition:
+            obj_class = nodes.NODE_CLASS_MAPPINGS[class_type]
+            node_def = NodeDefinition()
+            node_def.display_name = nodes.NODE_DISPLAY_NAME_MAPPINGS.get(node_class, node_class)
+            node_def.description = getattr(obj_class, 'DESCRIPTION', '')
+            node_def.category = getattr(obj_class, 'CATEGORY', 'sd')
+
+            input_types = obj_class.INPUT_TYPES()
+            for input_name, input_type in input_types.items():
+                input_def = NodeDefinition.InputDef()
+                input_def.display_name = input_name  # Assuming input_name is descriptive
+                input_def.edge_type = input_type
+                input_def.spec = Struct()  # Populate with appropriate spec if available
+                input_def.required = True  # Assuming all inputs are required
+                node_def.inputs[input_name] = input_def
+
+            output_types = obj_class.RETURN_TYPES
+            output_names = getattr(obj_class, 'RETURN_NAMES', output_types)
+            for output_name, output_type in zip(output_names, output_types):
+                output_def = NodeDefinition.OutputDef()
+                output_def.display_name = output_name
+                output_def.edge_type = output_type
+                node_def.outputs[output_name] = output_def
+
+            # Assuming UX widgets are predefined or can be derived
+            node_def.ux_widgets.extend(["core.image", "core.run"])  # Example widgets
+
+            return node_def
 
         def node_info(node_class):
             obj_class = nodes.NODE_CLASS_MAPPINGS[node_class]

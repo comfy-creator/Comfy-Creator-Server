@@ -1,18 +1,13 @@
-from __future__ import annotations
-
 import torch
 
 import os
 import sys
 import json
-# import hashlib
-import blake3
 import traceback
 import math
 import time
 import random
 import logging
-import io
 
 from PIL import Image, ImageOps, ImageSequence
 from PIL.PngImagePlugin import PngInfo
@@ -38,18 +33,50 @@ import importlib
 
 import folder_paths
 import latent_preview
-import node_helpers
 
-from typing import Dict, List, Optional, Tuple, Union, Any, BinaryIO
+from typing import Dict, List, Optional, Tuple, Union, BinaryIO
+
+import torchvision.transforms as transforms
+
 import requests
 from dotenv import load_dotenv
 import boto3
 from helper_decorators import convert_image_format
 from urllib.parse import urlparse
+import boto3
+import blake3
+import io
 
 
-load_dotenv()
 
+load_dotenv()  # Load environment variables from .env file
+
+env = os.getenv('ENV')
+
+
+# S3 configuration
+s3_folder = os.getenv('S3_FOLDER', '')
+s3_bucket_name = os.getenv('S3_BUCKET_NAME', '')
+s3_endpoint_fqdn = os.getenv('S3_ENDPOINT_FQDN', '')
+s3_access_key = os.getenv('S3_ACCESS_KEY', '')
+s3_secret_key = os.getenv('S3_SECRET_KEY', '')
+
+
+# Set up S3 client
+if env == 'PROD':
+    if not all([s3_bucket_name, s3_endpoint_fqdn, s3_access_key, s3_secret_key]):
+        raise ValueError('Missing S3 configuration in production mode')
+    s3 = boto3.client('s3',
+                      endpoint_url=f'https://{s3_endpoint_fqdn}',
+                      aws_access_key_id=s3_access_key,
+                      aws_secret_access_key=s3_secret_key,
+                      region_name=os.getenv("REGION_NAME"))
+else:
+    s3 = None
+
+
+# Create a temporary directory for caching files
+# temp_dir = folder_paths.get_temp_directory()
 
 
 def before_node_execution():
@@ -58,115 +85,46 @@ def before_node_execution():
 def interrupt_processing(value=True):
     comfy.model_management.interrupt_current_processing(value)
 
-MAX_RESOLUTION=16384
+MAX_RESOLUTION=8192
 
 class CLIPTextEncode:
     @classmethod
-    def INPUT_TYPES(s) -> Dict[str, Dict[str, Union[Tuple[str], Tuple[str, Dict]]]]:
-        """
-        Defines the expected input types for the layer.
-
-        Returns:
-            A dictionary specifying the required inputs and their properties.
-        """
-        return {"required": {"text": ("STRING", {"multiline": True, "dynamicPrompts": True}), "clip": ("CLIP", )}}
-    
+    def INPUT_TYPES(s):
+        return {"required": {"text": ("STRING", {"multiline": True}), "clip": ("CLIP", )}}
     RETURN_TYPES = ("CONDITIONING",)
     FUNCTION = "encode"
 
     CATEGORY = "conditioning"
 
-    def encode(self, clip: Any, text: str) -> Tuple[List[List[Union[torch.Tensor, Dict]]]]:
-        """
-        Encodes text using a CLIP model.
-
-        Args:
-            clip: A CLIP model object.
-            text: The text to be encoded. Can be multiline.
-
-        Returns:
-            A tuple containing a single-element list, where the element is another list representing the conditioning representation and its pooled output.
-        """
-
+    def encode(self, clip, text):
         tokens = clip.tokenize(text)
         cond, pooled = clip.encode_from_tokens(tokens, return_pooled=True)
         return ([[cond, {"pooled_output": pooled}]], )
 
 class ConditioningCombine:
-    """
-    This class combines two conditioning representations using element-wise addition.
-
-    It takes two conditioning representations as input and returns a new conditioning representation obtained by adding corresponding elements.
-    """
-
     @classmethod
-    def INPUT_TYPES(s) -> Dict[str, Dict[str, Tuple[str]]]:
-
+    def INPUT_TYPES(s):
         return {"required": {"conditioning_1": ("CONDITIONING", ), "conditioning_2": ("CONDITIONING", )}}
-    
     RETURN_TYPES = ("CONDITIONING",)
     FUNCTION = "combine"
 
     CATEGORY = "conditioning"
 
-    def combine(self, conditioning_1: List[Union[torch.Tensor, Dict]], 
-                conditioning_2: List[Union[torch.Tensor, Dict]]) -> Tuple[List[Union[torch.Tensor, Dict]]]:
-        """
-        Combines two conditioning representations using element-wise addition.
-
-        Args:
-            conditioning_1: The first conditioning representation.
-            conditioning_2: The second conditioning representation.
-
-        Returns:
-            A tuple containing the combined conditioning representation.
-        """
-
+    def combine(self, conditioning_1, conditioning_2):
         return (conditioning_1 + conditioning_2, )
 
-
-class ConditioningAverage:
-    """
-    This class implements a layer that performs a weighted average between a conditioning input and a target input.
-
-    The weights are determined by a `conditioning_to_strength` parameter, which ranges from 0.0 (all target) to 1.0 (all conditioning).
-    """
-
+class ConditioningAverage :
     @classmethod
-    def INPUT_TYPES(s) -> Dict[str, Dict[str, Union[Tuple[str], Tuple[str, dict[str, float]]]]]:
-        """
-        Defines the expected input types for the layer.
-
-        Returns:
-            A dictionary specifying the required inputs and their properties.
-        """
-        return {
-            "required": {
-                "conditioning_to": ("CONDITIONING",),
-                "conditioning_from": ("CONDITIONING",),
-                "conditioning_to_strength": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01}),
-            }
-        }
-
+    def INPUT_TYPES(s):
+        return {"required": {"conditioning_to": ("CONDITIONING", ), "conditioning_from": ("CONDITIONING", ),
+                              "conditioning_to_strength": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01})
+                             }}
     RETURN_TYPES = ("CONDITIONING",)
     FUNCTION = "addWeighted"
+
     CATEGORY = "conditioning"
 
-    def addWeighted(self, conditioning_to: List[Tuple[torch.Tensor, Dict]], conditioning_from: List[Tuple[torch.Tensor, Dict]],
-                    conditioning_to_strength: float = 1.0) -> Tuple[List[List[object]]]:
-        
-        """
-        Performs a weighted average between conditioning and target inputs.
-
-        Args:
-            conditioning_to: A list of tuples containing the target tensor and its metadata.
-            conditioning_from: A list of tuples containing the conditioning tensor and its metadata.
-            conditioning_to_strength: A float between 0.0 and 1.0 controlling the weight of the conditioning input.
-
-        Returns:
-            A tuple containing a list of lists, where each inner list represents the weighted average and metadata for a target element.
-        """
-
+    def addWeighted(self, conditioning_to, conditioning_from, conditioning_to_strength):
         out = []
 
         if len(conditioning_from) > 1:
@@ -195,7 +153,7 @@ class ConditioningAverage:
 
 class ConditioningConcat:
     @classmethod
-    def INPUT_TYPES(s) -> Dict[str, Dict[str, Tuple[str]]]:
+    def INPUT_TYPES(s):
         return {"required": {
             "conditioning_to": ("CONDITIONING",),
             "conditioning_from": ("CONDITIONING",),
@@ -206,7 +164,6 @@ class ConditioningConcat:
     CATEGORY = "conditioning"
 
     def concat(self, conditioning_to, conditioning_from):
-        
         out = []
 
         if len(conditioning_from) > 1:
@@ -223,17 +180,8 @@ class ConditioningConcat:
         return (out, )
 
 class ConditioningSetArea:
-    """
-    This class sets a specific area within a conditioning representation with a given strength.
-
-    It takes a conditioning representation, width, height, x-coordinate, y-coordinate, and strength as input.
-    The method modifies the conditioning representation by adding an entry representing the specified area with the provided strength.
-
-    The area is defined by a normalized bounding box `(height // 8, width // 8, y // 8, x // 8)`, where each value ranges from 0.0 to 1.0 representing the fraction of the conditioning representation covered.
-    """
-
     @classmethod
-    def INPUT_TYPES(s) -> Dict[str, Dict[str, Union[Tuple[str], Tuple[str, dict[str, float | int]]]]]:
+    def INPUT_TYPES(s):
         return {"required": {"conditioning": ("CONDITIONING", ),
                               "width": ("INT", {"default": 64, "min": 64, "max": MAX_RESOLUTION, "step": 8}),
                               "height": ("INT", {"default": 64, "min": 64, "max": MAX_RESOLUTION, "step": 8}),
@@ -246,28 +194,15 @@ class ConditioningSetArea:
 
     CATEGORY = "conditioning"
 
-    def append(self, conditioning: List[Tuple[torch.Tensor, Dict]],
-               width: int, height: int, x: int, y: int, strength: float) -> Tuple[List[List[object]]]:
-        """
-        Sets a specific area within a conditioning representation with a given strength.
-
-        Args:
-            conditioning: A list of tuples containing the conditioning tensor and its metadata.
-            width: The width of the area (in pixels).
-            height: The height of the area (in pixels).
-            x: The x-coordinate of the top-left corner of the area (in pixels).
-            y: The y-coordinate of the top-left corner of the area (in pixels).
-            strength: The strength of the area, controlling its influence.
-
-        Returns:
-            A tuple containing a single-element list, where the element is another list representing the modified conditioning representation.
-        """
-
-        def append(self, conditioning, width, height, x, y, strength):
-            c = node_helpers.conditioning_set_values(conditioning, {"area": (height // 8, width // 8, y // 8, x // 8),
-                                                                "strength": strength,
-                                                                "set_area_to_bounds": False})
-            return (c, )
+    def append(self, conditioning, width, height, x, y, strength):
+        c = []
+        for t in conditioning:
+            n = [t[0], t[1].copy()]
+            n[1]['area'] = (height // 8, width // 8, y // 8, x // 8)
+            n[1]['strength'] = strength
+            n[1]['set_area_to_bounds'] = False
+            c.append(n)
+        return (c, )
 
 class ConditioningSetAreaPercentage:
     @classmethod
@@ -285,9 +220,13 @@ class ConditioningSetAreaPercentage:
     CATEGORY = "conditioning"
 
     def append(self, conditioning, width, height, x, y, strength):
-        c = node_helpers.conditioning_set_values(conditioning, {"area": ("percentage", height, width, y, x),
-                                                                "strength": strength,
-                                                                "set_area_to_bounds": False})
+        c = []
+        for t in conditioning:
+            n = [t[0], t[1].copy()]
+            n[1]['area'] = ("percentage", height, width, y, x)
+            n[1]['strength'] = strength
+            n[1]['set_area_to_bounds'] = False
+            c.append(n)
         return (c, )
 
 class ConditioningSetAreaStrength:
@@ -302,7 +241,11 @@ class ConditioningSetAreaStrength:
     CATEGORY = "conditioning"
 
     def append(self, conditioning, strength):
-        c = node_helpers.conditioning_set_values(conditioning, {"strength": strength})
+        c = []
+        for t in conditioning:
+            n = [t[0], t[1].copy()]
+            n[1]['strength'] = strength
+            c.append(n)
         return (c, )
 
 
@@ -320,15 +263,19 @@ class ConditioningSetMask:
     CATEGORY = "conditioning"
 
     def append(self, conditioning, mask, set_cond_area, strength):
+        c = []
         set_area_to_bounds = False
         if set_cond_area != "default":
             set_area_to_bounds = True
         if len(mask.shape) < 3:
             mask = mask.unsqueeze(0)
-
-        c = node_helpers.conditioning_set_values(conditioning, {"mask": mask,
-                                                                "set_area_to_bounds": set_area_to_bounds,
-                                                                "mask_strength": strength})
+        for t in conditioning:
+            n = [t[0], t[1].copy()]
+            _, h, w = mask.shape
+            n[1]['mask'] = mask
+            n[1]['set_area_to_bounds'] = set_area_to_bounds
+            n[1]['mask_strength'] = strength
+            c.append(n)
         return (c, )
 
 class ConditioningZeroOut:
@@ -363,8 +310,13 @@ class ConditioningSetTimestepRange:
     CATEGORY = "advanced/conditioning"
 
     def set_range(self, conditioning, start, end):
-        c = node_helpers.conditioning_set_values(conditioning, {"start_percent": start,
-                                                                "end_percent": end})
+        c = []
+        for t in conditioning:
+            d = t[1].copy()
+            d['start_percent'] = start
+            d['end_percent'] = end
+            n = [t[0], d]
+            c.append(n)
         return (c, )
 
 class VAEDecode:
@@ -505,8 +457,13 @@ class InpaintModelConditioning:
 
         out = []
         for conditioning in [positive, negative]:
-            c = node_helpers.conditioning_set_values(conditioning, {"concat_latent_image": concat_latent,
-                                                                    "concat_mask": mask})
+            c = []
+            for t in conditioning:
+                d = t[1].copy()
+                d["concat_latent_image"] = concat_latent
+                d["concat_mask"] = mask
+                n = [t[0], d]
+                c.append(n)
             out.append(c)
         return (out[0], out[1], out_latent)
 
@@ -1086,7 +1043,7 @@ class GLIGENTextBoxApply:
         return {"required": {"conditioning_to": ("CONDITIONING", ),
                               "clip": ("CLIP", ),
                               "gligen_textbox_model": ("GLIGEN", ),
-                              "text": ("STRING", {"multiline": True, "dynamicPrompts": True}),
+                              "text": ("STRING", {"multiline": True}),
                               "width": ("INT", {"default": 64, "min": 8, "max": MAX_RESOLUTION, "step": 8}),
                               "height": ("INT", {"default": 64, "min": 8, "max": MAX_RESOLUTION, "step": 8}),
                               "x": ("INT", {"default": 0, "min": 0, "max": MAX_RESOLUTION, "step": 8}),
@@ -1463,8 +1420,478 @@ class KSampler:
     def sample(self, model, seed, steps, cfg, sampler_name, scheduler, positive, negative, latent_image, denoise=1.0):
         return common_ksampler(model, seed, steps, cfg, sampler_name, scheduler, positive, negative, latent_image, denoise=denoise)
 
+class KSamplerAdvanced:
+    @classmethod
+    def INPUT_TYPES(s):
+        return {"required":
+                    {"model": ("MODEL",),
+                    "add_noise": (["enable", "disable"], ),
+                    "noise_seed": ("INT", {"default": 0, "min": 0, "max": 0xffffffffffffffff}),
+                    "steps": ("INT", {"default": 20, "min": 1, "max": 10000}),
+                    "cfg": ("FLOAT", {"default": 8.0, "min": 0.0, "max": 100.0, "step":0.1, "round": 0.01}),
+                    "sampler_name": (comfy.samplers.KSampler.SAMPLERS, ),
+                    "scheduler": (comfy.samplers.KSampler.SCHEDULERS, ),
+                    "positive": ("CONDITIONING", ),
+                    "negative": ("CONDITIONING", ),
+                    "latent_image": ("LATENT", ),
+                    "start_at_step": ("INT", {"default": 0, "min": 0, "max": 10000}),
+                    "end_at_step": ("INT", {"default": 10000, "min": 0, "max": 10000}),
+                    "return_with_leftover_noise": (["disable", "enable"], ),
+                     }
+                }
 
-# --------------------------------------- Stability API Node ----------------------------------------------------- #
+    RETURN_TYPES = ("LATENT",)
+    FUNCTION = "sample"
+
+    CATEGORY = "sampling"
+
+    def sample(self, model, add_noise, noise_seed, steps, cfg, sampler_name, scheduler, positive, negative, latent_image, start_at_step, end_at_step, return_with_leftover_noise, denoise=1.0):
+        force_full_denoise = True
+        if return_with_leftover_noise == "enable":
+            force_full_denoise = False
+        disable_noise = False
+        if add_noise == "disable":
+            disable_noise = True
+        return common_ksampler(model, noise_seed, steps, cfg, sampler_name, scheduler, positive, negative, latent_image, denoise=denoise, disable_noise=disable_noise, start_step=start_at_step, last_step=end_at_step, force_full_denoise=force_full_denoise)
+
+
+# class SaveImage:
+#     def __init__(self):
+#         self.output_dir = folder_paths.get_output_directory()
+#         self.type = "output"
+#         self.prefix_append = ""
+#         self.compress_level = 4
+
+#     @classmethod
+#     def INPUT_TYPES(s):
+#         return {"required": 
+#                     {"images": ("IMAGE", ),
+#                      "filename_prefix": ("STRING", {"default": "ComfyUI"})},
+#                 "hidden": {"prompt": "PROMPT", "extra_pnginfo": "EXTRA_PNGINFO"},
+#                 }
+
+#     RETURN_TYPES = ()
+#     FUNCTION = "save_images"
+
+#     OUTPUT_NODE = True
+
+#     CATEGORY = "image"
+
+#     def save_images(self, images, filename_prefix="ComfyUI", prompt=None, extra_pnginfo=None):
+#         filename_prefix += self.prefix_append
+#         full_output_folder, filename, counter, subfolder, filename_prefix = folder_paths.get_save_image_path(filename_prefix, self.output_dir, images[0].shape[1], images[0].shape[0])
+#         results = list()
+#         for (batch_number, image) in enumerate(images):
+#             i = 255. * image.cpu().numpy()
+#             img = Image.fromarray(np.clip(i, 0, 255).astype(np.uint8))
+#             metadata = None
+#             if not args.disable_metadata:
+#                 metadata = PngInfo()
+#                 if prompt is not None:
+#                     metadata.add_text("prompt", json.dumps(prompt))
+#                 if extra_pnginfo is not None:
+#                     for x in extra_pnginfo:
+#                         metadata.add_text(x, json.dumps(extra_pnginfo[x]))
+
+#             filename_with_batch_num = filename.replace("%batch_num%", str(batch_number))
+#             file = f"{filename_with_batch_num}_{counter:05}_.png"
+#             img.save(os.path.join(full_output_folder, file), pnginfo=metadata, compress_level=self.compress_level)
+#             results.append({
+#                 "filename": file,
+#                 "subfolder": subfolder,
+#                 "type": self.type
+#             })
+#             counter += 1
+
+#         return { "ui": { "images": results } }
+
+# class PreviewImage(SaveImage):
+#     def __init__(self):
+#         self.output_dir = folder_paths.get_temp_directory()
+#         self.type = "temp"
+#         self.prefix_append = "_temp_" + ''.join(random.choice("abcdefghijklmnopqrstupvxyz") for x in range(5))
+#         self.compress_level = 1
+
+#     @classmethod
+#     def INPUT_TYPES(s):
+#         return {"required":
+#                     {"images": ("IMAGE", ), },
+#                 "hidden": {"prompt": "PROMPT", "extra_pnginfo": "EXTRA_PNGINFO"},
+#                 }
+
+
+
+
+
+@convert_image_format
+def save_image_to_respective_path(prefix_append, output_dir, 
+                                      images: torch.Tensor, filename_prefix, prompt, 
+                                      extra_pnginfo, compress_level,
+                                      type, results):
+        
+        filename_prefix += prefix_append
+        full_output_folder, filename, counter, subfolder, filename_prefix = folder_paths.get_save_image_path(
+            filename_prefix, output_dir, images[0].shape[1], images[0].shape[0]
+        )
+        for batch_number, image in enumerate(images):
+            i = 255. * image.cpu().numpy()
+            img = Image.fromarray(np.clip(i, 0, 255).astype(np.uint8))
+            metadata: Optional[PngInfo] = None
+            if not args.disable_metadata:
+                metadata = PngInfo()
+                if prompt is not None:
+                    metadata.add_text("prompt", json.dumps(prompt))
+                if extra_pnginfo is not None:
+                    for x in extra_pnginfo:
+                        metadata.add_text(x, json.dumps(extra_pnginfo[x]))
+
+            
+            filename_with_batch_num = filename.replace("%batch_num%", str(batch_number))
+            file = f"{filename_with_batch_num}_{counter:05}_.png"
+            img.save(os.path.join(full_output_folder, file), pnginfo=metadata, compress_level=compress_level)
+            results.append({"filename": file, "subfolder": subfolder, "type": type})
+            counter += 1
+
+
+class SaveFile:
+    def __init__(self) -> None:
+        self.output_dir = folder_paths.get_output_directory()
+        self.temp_dir = folder_paths.get_temp_directory()
+        self.type = "output"
+        self.prefix_append = ""
+        self.temp_prefix_append = "_temp_" + ''.join(random.choice("abcdefghijklmnopqrstupvxyz") for _ in range(5))
+        self.compress_level = 4
+        self.temp_compress_level = 1
+
+    @classmethod
+    def INPUT_TYPES(s) -> Dict[str, Union[Tuple[str, ...], Tuple[str, Dict[str, Union[str, int]]]]]:
+        return {
+            "required": {
+                "images": ("IMAGE", ),
+                "filename_prefix": ("STRING", {"default": "ComfyUI"}),
+                "preview": ("BOOLEAN", {"default": True}),
+                # "save_type": (["local", "s3"], {"default": "local"}),
+                "bucket_name": ("STRING", {"default": "my-bucket"}),
+            },
+            "hidden": {"prompt": "PROMPT", "extra_pnginfo": "EXTRA_PNGINFO"},
+        }
+
+    RETURN_TYPES: Tuple = ()
+    FUNCTION = "save_and_preview_images"
+
+    OUTPUT_NODE = True
+
+    CATEGORY = "image"
+
+
+    def save_and_preview_images(
+        self,
+        images: List[Union[torch.Tensor, bytes]],
+        preview: bool = True,
+        filename_prefix: str = "ComfyUI",
+        bucket_name: str = "my-bucket",
+        prompt = None,
+        extra_pnginfo = None,
+    ):
+        
+        results: List[Dict[str, Union[str, None]]] = []
+
+
+        if preview:
+            save_image_to_respective_path(self.temp_prefix_append, 
+                                      self.temp_dir, images, filename_prefix, prompt, 
+                                      extra_pnginfo, self.temp_compress_level, "temp", results)
+
+        if env == "LOCAL":
+            save_image_to_respective_path(self.prefix_append, self.output_dir, images, 
+                                          filename_prefix, prompt, extra_pnginfo, 
+                                          self.compress_level, self.type, results=[])
+        elif env == "PROD":
+            print("Here")
+            if isinstance(images, bytes) or isinstance(images, torch.Tensor):
+                print("Here 2")
+                image_url = self.upload_to_s3(images, bucket_name)
+                print(image_url )
+
+                if results:
+                    results[-1]["output"] = {"image_url": image_url}
+                else:
+                    results.append({"output": {"image_url": image_url}})
+
+        yield {"ui": {"images": results}}
+    
+    @convert_image_format
+    def upload_to_s3(self, image_data: bytes, bucket_name):
+
+        filename = f"{blake3.blake3(image_data).hexdigest()}.png"
+        key = f'{os.getenv("S3_FOLDER")}/{filename}'
+
+        # Upload the image data
+        s3.put_object(Bucket=s3_bucket_name, Key=key, Body=image_data, ACL="public-read")
+
+        # Generate and return the image URL
+        endpoint_url = s3.meta.endpoint_url
+        hostname = urlparse(endpoint_url).hostname
+        return f"https://{bucket_name}.{hostname}/{key}"
+    
+
+
+class BranchNode:
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "condition": ("BOOLEAN", ),  # Input condition for binary branches
+                "value": ("STRING", ),  # Input value for pattern-matching
+            },
+            "optional": {
+                "cases": ("DICT", {"multiline": True}),  # Dictionary of cases for pattern-matching
+            }
+        }
+
+    RETURN_TYPES = ("ANY",)  # Output can be of any type depending on the branch taken
+    FUNCTION = "branch"
+
+    def branch(self, condition, value, cases=None):
+        if cases is None:
+            # Binary branch
+            if condition:
+                return ({"expand": {"TrueOutput": {"class_type": "PassThrough"}}, "result": (True,)},)
+            else:
+                return ({"expand": {"FalseOutput": {"class_type": "PassThrough"}}, "result": (False,)},)
+        else:
+            # Pattern-matching branch
+            for case_value, subgraph in cases.items():
+                if case_value == value:
+                    return ({"expand": subgraph},)
+
+            # No matching case found
+            raise ValueError(f"No matching case found for value: {value}")
+        
+
+class PassThrough:
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {"required": {"input": ("ANY",)}}
+
+    RETURN_TYPES = ("ANY",)
+    FUNCTION = "pass_through"
+
+    def pass_through(self, input):
+        return (input,)
+    
+
+class ImageCheckWidth:
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "image": ("IMAGE",),
+                "width": ("INT", {"default": 512, "min": 1, "max": 8192}),
+            }
+        }
+
+    RETURN_TYPES = ("BOOLEAN",)
+    FUNCTION = "check_width"
+
+    def check_width(self, image, width):
+        return (image.shape[2] > width,)  # Check if image width is greater than the given width
+
+
+class LoadImage:
+
+    def __init__(self):
+        if not os.path.exists(folder_paths.get_temp_directory()):
+            os.makedirs(folder_paths.get_temp_directory())
+        self.temp_dir = folder_paths.get_temp_directory()
+
+    @classmethod
+    def INPUT_TYPES(s):
+        input_dir = folder_paths.get_input_directory()
+        files = [f for f in os.listdir(input_dir) if os.path.isfile(os.path.join(input_dir, f))]
+        return {"required":
+                    {"image": (sorted(files), {"image_upload": True})},
+                }
+
+    CATEGORY = "image"
+
+    RETURN_TYPES = ("IMAGE", "MASK")
+    FUNCTION = "load_image"
+
+    def load_image(self, image):
+        
+        # Check environment to know where to fetch files from
+        print(f'Environment: {env}')
+        if env == 'LOCAL':  
+            image_path = folder_paths.get_annotated_filepath(image)
+            img = Image.open(image_path)
+        elif env == 'PROD':
+            file_key = f'{s3_folder}/{image}' if s3_folder else image
+            cached_file = os.path.join(self.temp_dir, image)
+            print(cached_file)
+
+            if os.path.exists(cached_file):
+                img = Image.open(cached_file)
+            else:
+                try:
+                    print(f'Fetching image from S3 bucket: {s3_bucket_name}')
+                    s3_object = s3.get_object(Bucket=s3_bucket_name, Key=file_key)
+                    
+                    file_data = s3_object['Body'].read()
+                    img = Image.open(io.BytesIO(file_data))
+                    img.save(cached_file)
+                except s3.exceptions.NoSuchKey:
+                    raise FileNotFoundError(f'File not found in S3 bucket: {file_key}')
+        else:
+            raise ValueError("Please specify a valid environment name")
+
+
+        
+        output_images = []
+        output_masks = []
+        for i in ImageSequence.Iterator(img):
+            i = ImageOps.exif_transpose(i)
+            if i.mode == 'I':
+                i = i.point(lambda i: i * (1 / 255))
+            image = i.convert("RGB")
+            image = np.array(image).astype(np.float32) / 255.0
+            image = torch.from_numpy(image)[None,]
+            if 'A' in i.getbands():
+                mask = np.array(i.getchannel('A')).astype(np.float32) / 255.0
+                mask = 1. - torch.from_numpy(mask)
+            else:
+                mask = torch.zeros((64,64), dtype=torch.float32, device="cpu")
+            output_images.append(image)
+            output_masks.append(mask.unsqueeze(0))
+
+        if len(output_images) > 1:
+            output_image = torch.cat(output_images, dim=0)
+            output_mask = torch.cat(output_masks, dim=0)
+        else:
+            output_image = output_images[0]
+            output_mask = output_masks[0]
+
+        return (output_image, output_mask)
+
+    @classmethod
+    def IS_CHANGED(s, image):
+        image_path = folder_paths.get_annotated_filepath(image)
+        with open(image_path, 'rb') as f:
+            file_content = f.read()
+
+            # Open the image using PIL
+            image = Image.open(io.BytesIO(file_content))
+
+            # Get the pixel data
+            pixel_data = image.tobytes()
+
+            hash = blake3.blake3(pixel_data).hexdigest()
+            
+        return hash
+
+    @classmethod
+    def VALIDATE_INPUTS(s, image):
+        if env == 'LOCAL':
+            if not folder_paths.exists_annotated_filepath(image):
+                return "Invalid image file: {}".format(image)
+
+        return True
+
+class LoadImageMask:
+    _color_channels = ["alpha", "red", "green", "blue"]
+    @classmethod
+    def INPUT_TYPES(s):
+        input_dir = folder_paths.get_input_directory()
+        files = [f for f in os.listdir(input_dir) if os.path.isfile(os.path.join(input_dir, f))]
+        return {"required":
+                    {"image": (sorted(files), {"image_upload": True}),
+                     "channel": (s._color_channels, ), }
+                }
+
+    CATEGORY = "mask"
+
+    RETURN_TYPES = ("MASK",)
+    FUNCTION = "load_image"
+    def load_image(self, image, channel):
+        image_path = folder_paths.get_annotated_filepath(image)
+        i = Image.open(image_path)
+        i = ImageOps.exif_transpose(i)
+        if i.getbands() != ("R", "G", "B", "A"):
+            if i.mode == 'I':
+                i = i.point(lambda i: i * (1 / 255))
+            i = i.convert("RGBA")
+        mask = None
+        c = channel[0].upper()
+        if c in i.getbands():
+            mask = np.array(i.getchannel(c)).astype(np.float32) / 255.0
+            mask = torch.from_numpy(mask)
+            if c == 'A':
+                mask = 1. - mask
+        else:
+            mask = torch.zeros((64,64), dtype=torch.float32, device="cpu")
+        return (mask.unsqueeze(0),)
+
+    @classmethod
+    def IS_CHANGED(s, image, channel):
+        image_path = folder_paths.get_annotated_filepath(image)
+        with open(image_path, 'rb') as f:
+            file_content = f.read()
+
+            # Open the image using PIL
+            image = Image.open(io.BytesIO(file_content))
+
+            # Get the pixel data
+            pixel_data = image.tobytes()
+
+            hash = blake3.blake3(pixel_data).hexdigest()
+
+        return hash
+
+    @classmethod
+    def VALIDATE_INPUTS(s, image):
+        if not folder_paths.exists_annotated_filepath(image):
+            return "Invalid image file: {}".format(image)
+
+        return True
+
+
+# Clean up temporary directory
+# shutil.rmtree(temp_dir)
+
+
+class ImageScale:
+    upscale_methods = ["nearest-exact", "bilinear", "area", "bicubic", "lanczos"]
+    crop_methods = ["disabled", "center"]
+
+    @classmethod
+    def INPUT_TYPES(s):
+        return {"required": { "image": ("IMAGE",), "upscale_method": (s.upscale_methods,),
+                              "width": ("INT", {"default": 512, "min": 0, "max": MAX_RESOLUTION, "step": 1}),
+                              "height": ("INT", {"default": 512, "min": 0, "max": MAX_RESOLUTION, "step": 1}),
+                              "crop": (s.crop_methods,)}}
+    RETURN_TYPES = ("IMAGE",)
+    FUNCTION = "upscale"
+
+    CATEGORY = "image/upscaling"
+
+    def upscale(self, image, upscale_method, width, height, crop):
+        if width == 0 and height == 0:
+            s = image
+        else:
+            samples = image.movedim(-1,1)
+
+            if width == 0:
+                width = max(1, round(samples.shape[3] * height / samples.shape[2]))
+            elif height == 0:
+                height = max(1, round(samples.shape[2] * width / samples.shape[3]))
+
+            s = comfy.utils.common_upscale(samples, width, height, upscale_method, crop)
+            s = s.movedim(1,-1)
+        return (s,)
+
+
+# --------------------------------------- Stable Diffusion API Node ----------------------------------------------------- #
+
 class SDAPI:
 
     def __init__(self):
@@ -1586,7 +2013,8 @@ class SDAPISaveImage:
 
     CATEGORY = "sd3"
 
-    def save(self, image_content, filename_prefix="SDAPI"):
+    @convert_image_format
+    def save(self, image_content: bytes, filename_prefix="SDAPI"):
         full_output_folder, filename, counter, subfolder, filename_prefix = folder_paths.get_save_image_path(filename_prefix, self.output_dir)
         file = f"{filename}_{counter:05}_.png"
         filepath = os.path.join(full_output_folder, file)
@@ -1624,383 +2052,8 @@ class SDAPIPreviewImage:
 
         results = [{"filename": file, "subfolder": subfolder, "type": "temp"}]
         return {"ui": {"images": results}}
-    
 
-@convert_image_format
-def save_image_to_respective_path(prefix_append, output_dir, 
-                                      images: torch.Tensor, filename_prefix, prompt, 
-                                      extra_pnginfo, compress_level,
-                                      type, results):
-        
-        filename_prefix += prefix_append
-        full_output_folder, filename, counter, subfolder, filename_prefix = folder_paths.get_save_image_path(
-            filename_prefix, output_dir, images[0].shape[1], images[0].shape[0]
-        )
-        for batch_number, image in enumerate(images):
-            i = 255. * image.cpu().numpy()
-            img = Image.fromarray(np.clip(i, 0, 255).astype(np.uint8))
-            metadata: Optional[PngInfo] = None
-            if not args.disable_metadata:
-                metadata = PngInfo()
-                if prompt is not None:
-                    metadata.add_text("prompt", json.dumps(prompt))
-                if extra_pnginfo is not None:
-                    for x in extra_pnginfo:
-                        metadata.add_text(x, json.dumps(extra_pnginfo[x]))
 
-            
-            filename_with_batch_num = filename.replace("%batch_num%", str(batch_number))
-            file = f"{filename_with_batch_num}_{counter:05}_.png"
-            img.save(os.path.join(full_output_folder, file), pnginfo=metadata, compress_level=compress_level)
-            results.append({"filename": file, "subfolder": subfolder, "type": type})
-            counter += 1
-
-
-class SaveAndPreviewImage:
-    def __init__(self) -> None:
-        self.output_dir = folder_paths.get_output_directory()
-        self.temp_dir = folder_paths.get_temp_directory()
-        self.type = "output"
-        self.prefix_append = ""
-        self.temp_prefix_append = "_temp_" + ''.join(random.choice("abcdefghijklmnopqrstupvxyz") for _ in range(5))
-        self.compress_level = 4
-        self.temp_compress_level = 1
-
-    @classmethod
-    def INPUT_TYPES(s) -> Dict[str, Union[Tuple[str, ...], Tuple[str, Dict[str, Union[str, int]]]]]:
-        return {
-            "required": {
-                "images": ("IMAGE", ),
-                "filename_prefix": ("STRING", {"default": "ComfyUI"}),
-                # "save_images": ("BOOLEAN", {"default": False}),
-                "save_type": (["local", "s3"], {"default": "local"}),
-                "bucket_name": ("STRING", {"default": "my-bucket"}),
-            },
-            "hidden": {"prompt": "PROMPT", "extra_pnginfo": "EXTRA_PNGINFO"},
-        }
-
-    RETURN_TYPES: Tuple = ()
-    FUNCTION = "save_and_preview_images"
-
-    OUTPUT_NODE = True
-
-    CATEGORY = "image"
-
-
-    def save_and_preview_images(
-        self,
-        images: List[Union[torch.Tensor, bytes]],
-        filename_prefix: str = "ComfyUI",
-        # save_images: bool = False,
-        save_type: str = "local",
-        bucket_name: str = "my-bucket",
-        prompt = None,
-        extra_pnginfo = None,
-    ) -> Dict[str, Dict[str, List[Dict[str, Union[str, None]]]]]:
-        
-        results: List[Dict[str, Union[str, None]]] = []
-
-
-
-        save_image_to_respective_path(self.temp_prefix_append, 
-                                      self.temp_dir, images, filename_prefix, prompt, 
-                                      extra_pnginfo, self.temp_compress_level, "temp", results)
-
-        if save_type == "local":
-            save_image_to_respective_path(self.prefix_append, self.output_dir, images, 
-                                          filename_prefix, prompt, extra_pnginfo, 
-                                          self.compress_level, self.type, results=[])
-        elif save_type == "s3":
-            print("Here")
-            if isinstance(images, bytes) or isinstance(images, torch.Tensor):
-                print("Here 2")
-                file = results[0]["filename"]
-                image_url = self.upload_to_s3(images, file, bucket_name)
-                print(image_url )
-
-                results[-1]["output"] = {"image_url": image_url}
-
-        print(results)
-
-        return {"ui": {"images": results}}
-    
-    @convert_image_format
-    def upload_to_s3(self, image_data: bytes, filename, bucket_name):
-        
-        # Configure your S3 client with access keys, endpoint URL, region, and bucket name
-        session = boto3.Session(
-            aws_access_key_id=os.getenv("DO_ACCESS_KEY_ID"),
-            aws_secret_access_key=os.getenv("DO_SECRET_ACCESS_KEY"),
-            region_name=os.getenv("REGION_NAME"),
-        )
-        s3_client = session.client("s3", endpoint_url=os.getenv("DO_ENDPOINT_URL"))
-        bucket_name = os.getenv("BUCKET_NAME")
-
-        key = f"comfy-test/{filename}"
-
-        # Upload the image data
-        s3_client.put_object(Bucket=bucket_name, Key=key, Body=image_data, ACL="public-read")
-
-        # Generate and return the image URL
-        endpoint_url = s3_client.meta.endpoint_url
-        hostname = urlparse(endpoint_url).hostname
-        return f"https://{bucket_name}.{hostname}/{key}"
-
-
-
-
-
-class KSamplerAdvanced:
-    @classmethod
-    def INPUT_TYPES(s):
-        return {"required":
-                    {"model": ("MODEL",),
-                    "add_noise": (["enable", "disable"], ),
-                    "noise_seed": ("INT", {"default": 0, "min": 0, "max": 0xffffffffffffffff}),
-                    "steps": ("INT", {"default": 20, "min": 1, "max": 10000}),
-                    "cfg": ("FLOAT", {"default": 8.0, "min": 0.0, "max": 100.0, "step":0.1, "round": 0.01}),
-                    "sampler_name": (comfy.samplers.KSampler.SAMPLERS, ),
-                    "scheduler": (comfy.samplers.KSampler.SCHEDULERS, ),
-                    "positive": ("CONDITIONING", ),
-                    "negative": ("CONDITIONING", ),
-                    "latent_image": ("LATENT", ),
-                    "start_at_step": ("INT", {"default": 0, "min": 0, "max": 10000}),
-                    "end_at_step": ("INT", {"default": 10000, "min": 0, "max": 10000}),
-                    "return_with_leftover_noise": (["disable", "enable"], ),
-                     }
-                }
-
-    RETURN_TYPES = ("LATENT",)
-    FUNCTION = "sample"
-
-    CATEGORY = "sampling"
-
-    def sample(self, model, add_noise, noise_seed, steps, cfg, sampler_name, scheduler, positive, negative, latent_image, start_at_step, end_at_step, return_with_leftover_noise, denoise=1.0):
-        force_full_denoise = True
-        if return_with_leftover_noise == "enable":
-            force_full_denoise = False
-        disable_noise = False
-        if add_noise == "disable":
-            disable_noise = True
-        return common_ksampler(model, noise_seed, steps, cfg, sampler_name, scheduler, positive, negative, latent_image, denoise=denoise, disable_noise=disable_noise, start_step=start_at_step, last_step=end_at_step, force_full_denoise=force_full_denoise)
-
-class SaveImage:
-    def __init__(self):
-        self.output_dir = folder_paths.get_output_directory()
-        self.type = "output"
-        self.prefix_append = ""
-        self.compress_level = 4
-
-    @classmethod
-    def INPUT_TYPES(s):
-        return {"required": 
-                    {"images": ("IMAGE", ),
-                     "filename_prefix": ("STRING", {"default": "ComfyUI"})},
-                "hidden": {"prompt": "PROMPT", "extra_pnginfo": "EXTRA_PNGINFO"},
-                }
-
-    RETURN_TYPES = ()
-    FUNCTION = "save_images"
-
-    OUTPUT_NODE = True
-
-    CATEGORY = "image"
-
-    @convert_image_format
-    def save_images(self, images, filename_prefix="ComfyUI", prompt=None, extra_pnginfo=None):
-        filename_prefix += self.prefix_append
-        full_output_folder, filename, counter, subfolder, filename_prefix = folder_paths.get_save_image_path(filename_prefix, self.output_dir, images[0].shape[1], images[0].shape[0])
-        results = list()
-        for (batch_number, image) in enumerate(images):
-            i = 255. * image.cpu().numpy()
-            img = Image.fromarray(np.clip(i, 0, 255).astype(np.uint8))
-            metadata = None
-            if not args.disable_metadata:
-                metadata = PngInfo()
-                if prompt is not None:
-                    metadata.add_text("prompt", json.dumps(prompt))
-                if extra_pnginfo is not None:
-                    for x in extra_pnginfo:
-                        metadata.add_text(x, json.dumps(extra_pnginfo[x]))
-
-            filename_with_batch_num = filename.replace("%batch_num%", str(batch_number))
-            file = f"{filename_with_batch_num}_{counter:05}_.png"
-            img.save(os.path.join(full_output_folder, file), pnginfo=metadata, compress_level=self.compress_level)
-            results.append({
-                "filename": file,
-                "subfolder": subfolder,
-                "type": self.type
-            })
-            counter += 1
-
-
-        return { "ui": { "images": results } }
-
-class PreviewImage(SaveImage):
-    def __init__(self):
-        self.output_dir = folder_paths.get_temp_directory()
-        self.type = "temp"
-        self.prefix_append = "_temp_" + ''.join(random.choice("abcdefghijklmnopqrstupvxyz") for x in range(5))
-        self.compress_level = 1
-
-    @classmethod
-    def INPUT_TYPES(s):
-        return {"required":
-                    {"images": ("IMAGE", ), },
-                "hidden": {"prompt": "PROMPT", "extra_pnginfo": "EXTRA_PNGINFO"},
-                }
-
-class LoadImage:
-    @classmethod
-    def INPUT_TYPES(s):
-        input_dir = folder_paths.get_input_directory()
-        files = [f for f in os.listdir(input_dir) if os.path.isfile(os.path.join(input_dir, f))]
-        return {"required":
-                    {"image": (sorted(files), {"image_upload": True})},
-                }
-
-    CATEGORY = "image"
-
-    RETURN_TYPES = ("IMAGE", "MASK")
-    FUNCTION = "load_image"
-    def load_image(self, image):
-        image_path = folder_paths.get_annotated_filepath(image)
-        img = Image.open(image_path)
-        output_images = []
-        output_masks = []
-        for i in ImageSequence.Iterator(img):
-            i = ImageOps.exif_transpose(i)
-            if i.mode == 'I':
-                i = i.point(lambda i: i * (1 / 255))
-            image = i.convert("RGB")
-            image = np.array(image).astype(np.float32) / 255.0
-            image = torch.from_numpy(image)[None,]
-            if 'A' in i.getbands():
-                mask = np.array(i.getchannel('A')).astype(np.float32) / 255.0
-                mask = 1. - torch.from_numpy(mask)
-            else:
-                mask = torch.zeros((64,64), dtype=torch.float32, device="cpu")
-            output_images.append(image)
-            output_masks.append(mask.unsqueeze(0))
-
-        if len(output_images) > 1:
-            output_image = torch.cat(output_images, dim=0)
-            output_mask = torch.cat(output_masks, dim=0)
-        else:
-            output_image = output_images[0]
-            output_mask = output_masks[0]
-
-        return (output_image, output_mask)
-
-    @classmethod
-    def IS_CHANGED(s, image):
-        image_path = folder_paths.get_annotated_filepath(image)
-        with open(image_path, 'rb') as f:
-            file_content = f.read()
-
-            # Open the image using PIL
-            image = Image.open(io.BytesIO(file_content))
-
-            # Get the pixel data
-            pixel_data = image.tobytes()
-
-            hash = blake3.blake3(pixel_data).hexdigest()
-            
-        return hash
-
-    @classmethod
-    def VALIDATE_INPUTS(s, image):
-        if not folder_paths.exists_annotated_filepath(image):
-            return "Invalid image file: {}".format(image)
-
-        return True
-
-class LoadImageMask:
-    _color_channels = ["alpha", "red", "green", "blue"]
-    @classmethod
-    def INPUT_TYPES(s):
-        input_dir = folder_paths.get_input_directory()
-        files = [f for f in os.listdir(input_dir) if os.path.isfile(os.path.join(input_dir, f))]
-        return {"required":
-                    {"image": (sorted(files), {"image_upload": True}),
-                     "channel": (s._color_channels, ), }
-                }
-
-    CATEGORY = "mask"
-
-    RETURN_TYPES = ("MASK",)
-    FUNCTION = "load_image"
-    def load_image(self, image, channel):
-        image_path = folder_paths.get_annotated_filepath(image)
-        i = Image.open(image_path)
-        i = ImageOps.exif_transpose(i)
-        if i.getbands() != ("R", "G", "B", "A"):
-            if i.mode == 'I':
-                i = i.point(lambda i: i * (1 / 255))
-            i = i.convert("RGBA")
-        mask = None
-        c = channel[0].upper()
-        if c in i.getbands():
-            mask = np.array(i.getchannel(c)).astype(np.float32) / 255.0
-            mask = torch.from_numpy(mask)
-            if c == 'A':
-                mask = 1. - mask
-        else:
-            mask = torch.zeros((64,64), dtype=torch.float32, device="cpu")
-        return (mask.unsqueeze(0),)
-
-    @classmethod
-    def IS_CHANGED(s, image, channel):
-        image_path = folder_paths.get_annotated_filepath(image)
-        with open(image_path, 'rb') as f:
-            file_content = f.read()
-
-            # Open the image using PIL
-            image = Image.open(io.BytesIO(file_content))
-
-            # Get the pixel data
-            pixel_data = image.tobytes()
-
-            hash = blake3.blake3(pixel_data).hexdigest()
-
-        return hash
-
-    @classmethod
-    def VALIDATE_INPUTS(s, image):
-        if not folder_paths.exists_annotated_filepath(image):
-            return "Invalid image file: {}".format(image)
-
-        return True
-
-class ImageScale:
-    upscale_methods = ["nearest-exact", "bilinear", "area", "bicubic", "lanczos"]
-    crop_methods = ["disabled", "center"]
-
-    @classmethod
-    def INPUT_TYPES(s):
-        return {"required": { "image": ("IMAGE",), "upscale_method": (s.upscale_methods,),
-                              "width": ("INT", {"default": 512, "min": 0, "max": MAX_RESOLUTION, "step": 1}),
-                              "height": ("INT", {"default": 512, "min": 0, "max": MAX_RESOLUTION, "step": 1}),
-                              "crop": (s.crop_methods,)}}
-    RETURN_TYPES = ("IMAGE",)
-    FUNCTION = "upscale"
-
-    CATEGORY = "image/upscaling"
-
-    def upscale(self, image, upscale_method, width, height, crop):
-        if width == 0 and height == 0:
-            s = image
-        else:
-            samples = image.movedim(-1,1)
-
-            if width == 0:
-                width = max(1, round(samples.shape[3] * height / samples.shape[2]))
-            elif height == 0:
-                height = max(1, round(samples.shape[2] * width / samples.shape[3]))
-
-            s = comfy.utils.common_upscale(samples, width, height, upscale_method, crop)
-            s = s.movedim(1,-1)
-        return (s,)
 
 class ImageScaleBy:
     upscale_methods = ["nearest-exact", "bilinear", "area", "bicubic", "lanczos"]
@@ -2138,12 +2191,36 @@ class ImagePadForOutpaint:
         mask[top:top + d2, left:left + d3] = t
 
         return (new_image, mask)
+    
 
 
+class ConstantNode:
+    def __init__(self):
+        pass
+    
+    @classmethod
+    def INPUT_TYPES(s):
+        return {"required": {"values": ("*", {"lazy": True})}}  # Accepts a dictionary of values
+
+    RETURN_TYPES = ("*",)  # Returns the same dictionary of values
+    FUNCTION = "pass_through"
+
+    CATEGORY = "misc"  # Or any appropriate category
+
+    def pass_through(self, values=None):
+        print(values)
+        if values:
+            return (values,)
+        else:
+            return ({},)
 
 
 
 NODE_CLASS_MAPPINGS = {
+    "ConstantNode": ConstantNode,
+    "ImageCheckWidth": ImageCheckWidth,
+    "BranchNode": BranchNode,
+    "PassThrough": PassThrough,
     "SDAPISaveImage": SDAPISaveImage,
     "SDAPIPreviewImage": SDAPIPreviewImage,
     "SDAPI": SDAPI,
@@ -2160,8 +2237,9 @@ NODE_CLASS_MAPPINGS = {
     "LatentUpscaleBy": LatentUpscaleBy,
     "LatentFromBatch": LatentFromBatch,
     "RepeatLatentBatch": RepeatLatentBatch,
-    "SaveImage": SaveImage,
-    "PreviewImage": PreviewImage,
+    #eImage": SaveImage,
+    #viewImage": PreviewImage,
+    "SaveFile": SaveFile,
     "LoadImage": LoadImage,
     "LoadImageMask": LoadImageMask,
     "ImageScale": ImageScale,
@@ -2216,6 +2294,10 @@ NODE_CLASS_MAPPINGS = {
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
+    "ConstantNode": "Constant",
+    "ImageCheckWidth": "Image Check Width", 
+    "BranchNode": "Branch Node",
+    "PassThrough": "Pass Through",
     # Diffusion
     "SDAPI": "Stable Diffusion API",
     "SDAPISaveImage": "SDAPI Save Image",
@@ -2263,8 +2345,9 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "LatentFromBatch" : "Latent From Batch",
     "RepeatLatentBatch": "Repeat Latent Batch",
     # Image
-    "SaveImage": "Save Image",
-    "PreviewImage": "Preview Image",
+    # "SaveImage": "Save Image",
+    # "PreviewImage": "Preview Image",
+    "SaveFile": "Save File",
     "LoadImage": "Load Image",
     "LoadImageMask": "Load Image (as Mask)",
     "ImageScale": "Upscale Image",
@@ -2286,7 +2369,6 @@ def load_custom_node(module_path, ignore=set()):
         sp = os.path.splitext(module_path)
         module_name = sp[0]
     try:
-        logging.debug("Trying to load custom node {}".format(module_path))
         if os.path.isfile(module_path):
             module_spec = importlib.util.spec_from_file_location(module_name, module_path)
             module_dir = os.path.split(module_path)[0]
@@ -2304,11 +2386,24 @@ def load_custom_node(module_path, ignore=set()):
                 EXTENSION_WEB_DIRS[module_name] = web_dir
 
         if hasattr(module, "NODE_CLASS_MAPPINGS") and getattr(module, "NODE_CLASS_MAPPINGS") is not None:
+
+            # namespace = getattr(module, "NAMESPACE", module_name)  # Extract namespace
+
+            # if namespace.lower() == "default":  # Check for "default" namespace
+            #     namespace = module_name  # Fallback to module name
+
             for name in module.NODE_CLASS_MAPPINGS:
                 if name not in ignore:
+                    # namespaced_name = f"{namespace}.{name}"  # Prepend namespace to node name
                     NODE_CLASS_MAPPINGS[name] = module.NODE_CLASS_MAPPINGS[name]
-            if hasattr(module, "NODE_DISPLAY_NAME_MAPPINGS") and getattr(module, "NODE_DISPLAY_NAME_MAPPINGS") is not None:
-                NODE_DISPLAY_NAME_MAPPINGS.update(module.NODE_DISPLAY_NAME_MAPPINGS)
+                    
+                    
+                if hasattr(module, "NODE_DISPLAY_NAME_MAPPINGS"):
+                    display_name = module.NODE_DISPLAY_NAME_MAPPINGS.get(name)  # Get display name
+                    if display_name:
+                        NODE_DISPLAY_NAME_MAPPINGS[name] = display_name  # Update with namespaced name
+            
+                
             return True
         else:
             logging.warning(f"Skip {module_path} module for custom nodes due to the lack of NODE_CLASS_MAPPINGS.")
@@ -2375,9 +2470,6 @@ def init_custom_nodes():
         "nodes_morphology.py",
         "nodes_stable_cascade.py",
         "nodes_differential_diffusion.py",
-        "nodes_ip2p.py",
-        "nodes_model_merging_model_specific.py",
-        "nodes_pag.py",
     ]
 
     import_failed = []

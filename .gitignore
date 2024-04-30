@@ -21,6 +21,7 @@ venv/
 /user/
 *error.log
 .env
+prev_nodes.py
 
 
 **/node_modules/

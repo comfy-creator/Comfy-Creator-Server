@@ -46,6 +46,7 @@ from urllib.parse import urlparse
 import boto3
 import blake3
 import io
+import pkg_resources
 
 
 
@@ -86,6 +87,24 @@ def interrupt_processing(value=True):
     comfy.model_management.interrupt_current_processing(value)
 
 MAX_RESOLUTION=8192
+
+
+def discover_custom_nodes():
+    for entry_point in pkg_resources.iter_entry_points("comfyui_custom_nodes"):
+        module_name = entry_point.name
+        node_mapping = entry_point.load()()
+
+        namespaced_mapping = {}
+        for node_name, node_class in node_mapping.items():
+            namespaced_name = f"{module_name}.{node_name}"
+            namespaced_mapping[namespaced_name] = node_class
+
+            # Use DISPLAY_NAME if available, otherwise fallback to node_name
+            display_name = getattr(node_class, "DISPLAY_NAME", node_name)
+            NODE_DISPLAY_NAME_MAPPINGS[namespaced_name] = display_name
+
+        NODE_CLASS_MAPPINGS.update(namespaced_mapping)
+
 
 class CLIPTextEncode:
     @classmethod
@@ -2368,6 +2387,8 @@ def load_custom_node(module_path, ignore=set()):
     if os.path.isfile(module_path):
         sp = os.path.splitext(module_path)
         module_name = sp[0]
+        print("Here")
+        print(module_name)
     try:
         if os.path.isfile(module_path):
             module_spec = importlib.util.spec_from_file_location(module_name, module_path)
@@ -2387,21 +2408,29 @@ def load_custom_node(module_path, ignore=set()):
 
         if hasattr(module, "NODE_CLASS_MAPPINGS") and getattr(module, "NODE_CLASS_MAPPINGS") is not None:
 
-            # namespace = getattr(module, "NAMESPACE", module_name)  # Extract namespace
+            namespace = getattr(module, "NAMESPACE", module_name)  # Extract namespace
 
-            # if namespace.lower() == "default":  # Check for "default" namespace
-            #     namespace = module_name  # Fallback to module name
+            if namespace.lower() == "default":  # Check for "default" namespace
+                namespace = module_name  # Fallback to module name
 
             for name in module.NODE_CLASS_MAPPINGS:
                 if name not in ignore:
-                    # namespaced_name = f"{namespace}.{name}"  # Prepend namespace to node name
-                    NODE_CLASS_MAPPINGS[name] = module.NODE_CLASS_MAPPINGS[name]
+                    # Check and split files in comfy_extras to get namespace
+                    if os.path.isfile(module_path):
+                        file_name = os.path.basename(module_name)  # Use module name as namespace
+                        namespaced_name = f"{file_name}.{name}"
+                        print(namespaced_name)
+                    else:
+                        namespaced_name = f"{namespace}.{name}"  # Prepend namespace to node name
+                    NODE_CLASS_MAPPINGS[namespaced_name] = module.NODE_CLASS_MAPPINGS[name]
                     
                     
                 if hasattr(module, "NODE_DISPLAY_NAME_MAPPINGS"):
                     display_name = module.NODE_DISPLAY_NAME_MAPPINGS.get(name)  # Get display name
                     if display_name:
-                        NODE_DISPLAY_NAME_MAPPINGS[name] = display_name  # Update with namespaced name
+                        NODE_DISPLAY_NAME_MAPPINGS[namespaced_name] = display_name  # Update with namespaced name
+                else:
+                    NODE_DISPLAY_NAME_MAPPINGS[namespaced_name] = name
             
                 
             return True
@@ -2412,6 +2441,7 @@ def load_custom_node(module_path, ignore=set()):
         logging.warning(traceback.format_exc())
         logging.warning(f"Cannot import {module_path} module for custom nodes: {e}")
         return False
+    
 
 def load_custom_nodes():
     base_node_names = set(NODE_CLASS_MAPPINGS.keys())
@@ -2441,6 +2471,7 @@ def load_custom_nodes():
         logging.info("")
 
 def init_custom_nodes():
+    discover_custom_nodes()
     extras_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), "comfy_extras")
     extras_files = [
         "nodes_latent.py",
